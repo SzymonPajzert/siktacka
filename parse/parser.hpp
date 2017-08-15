@@ -4,15 +4,18 @@
 #include <getopt.h>
 #include <memory>
 #include "def/types.hpp"
+#include "def/ipaddr.hpp"
 #include <string>
 #include <sstream>
+#include <utility>
+#include <iostream>
 
 
 struct server_param {
     dim_t width, height;
     port_t port;
-    speed_t speed;
-    speed_t turn;
+    speed_t rounds_sec;
+    speed_t turning;
     seed_t seed;
 
     static const dim_t DEFAULT_WIDTH = 800;
@@ -26,70 +29,47 @@ struct server_param {
     }
 };
 
-void parse_error(const std::string & message) {
-    // TODO
-}
+struct client_param {
+    std::string player_name;
+    IP server_address;
+    IP gui_address;
 
-template<typename T>
-maybe<T> parse_int(const std::string & int_string) {
-    bool all_digit = true;
-    for(char digit : int_string) {
-        all_digit = all_digit && (isdigit(digit) != 0);
-    }
+    static const port_t default_server_port = 12345;
+    static const std::string default_gui_address;
+    static const port_t default_gui_port = 12346;
 
-    if(all_digit) {
-        return std::make_unique<T>(std::stoi(int_string));
-    } else {
-        return nullptr;
-    }
-}
+    client_param(std::string _player_name, IP _server_address, IP _gui_address)
+            : player_name(std::move(_player_name))
+            , server_address(std::move(_server_address))
+            , gui_address(std::move(_gui_address)) {}
 
-// TODO move to unnamed namespace
-template<typename T>
-void try_parse(T & target, std::string var_name) {
-    if(!maybe_assign<T>(parse_int<T>(optarg), target)) {
-        std::string message = "Wrong argument to ";
-        message.append(var_name);
-        parse_error(message);
-    }
-}
+    static WARN_UNUSED bool correct_player_name(const std::string &player_name) {
+        bool result = true;
 
-server_param parse_server(int argc, char **argv) {
-    dim_t width = server_param::DEFAULT_WIDTH;
-    dim_t height = server_param::DEFAULT_HEIGHT;
-    port_t port = server_param::DEFAULT_PORT;
-    speed_t speed = server_param::DEFAULT_SPEED;
-    speed_t turn = server_param::DEFAULT_TURN;
-    seed_t seed = server_param::DEFAULT_SEED();
-
-    int c;
-    while ((c = getopt (argc, argv, "W:H:p:s:t:r:")) != -1) {
-        if (c == '?') {
-            std::stringstream message;
-            message <<
-                    "Option: " <<
-                    (char) optopt <<
-                    "requires an argument";
-            parse_error(message.str());
-            break;
+        result = result && player_name.length() <= client_param::max_player_name_len;
+        for(auto c : player_name) {
+            result =
+                    result &&
+                    c >= client_param::min_allowed_player_name_char &&
+                    c <= client_param::max_allowed_player_name_char;
         }
 
-        switch (c) {
-            case 'W':try_parse(width, "width");break;
-            case 'H':try_parse(height, "height");break;
-            case 'p':try_parse(port, "port"); break;
-            case 's':try_parse(speed, "speed");break;
-            case 't':try_parse(turn, "turn");break;
-            case 'r':try_parse(seed, "seed");break;
-            default:
-                parse_error("I don't event know what's going on");
-        }
+        return result;
     }
 
-    return server_param { width, height, port, speed, turn, seed };
-}
+private:
+    static constexpr int max_player_name_len = 64;
+    static constexpr int min_allowed_player_name_char = 33;
+    static constexpr int max_allowed_player_name_char = 126;
+};
 
+[[ noreturn ]] void parse_error(const std::string & message);
 
+template<typename T>
+void try_parse(T & target, const std::string &var_name);
 
+maybe<server_param> parse_server(int argc, char **argv);
+
+maybe<client_param> parse_client(int argc, char **argv);
 
 #endif //SIKTACKA_PARSER_HPP
