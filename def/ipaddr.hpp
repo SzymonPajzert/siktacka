@@ -7,6 +7,7 @@
 
 #include <netinet/in.h>
 #include <netdb.h>
+#include <vector>
 #include "types.hpp"
 #include "util.hpp"
 
@@ -28,36 +29,42 @@ public:
 
     // TODO move
     static maybe<sockaddr_in> convert_address(const std::string & ip_string, port_t port) {
-        std::shared_ptr<sockaddr_in> address;
+        std::shared_ptr<sockaddr_in> address = nullptr;
         struct addrinfo addr_hints {};
         struct addrinfo *addr_result;
 
-        // 'converting' host/port in string to struct addrinfo
-        (void) memset(&addr_hints, 0, sizeof(struct addrinfo));
-        addr_hints.ai_family = AF_INET; // IPv4
-        addr_hints.ai_socktype = SOCK_DGRAM;
-        addr_hints.ai_protocol = IPPROTO_UDP;
-        addr_hints.ai_flags = 0;
-        addr_hints.ai_addrlen = 0;
-        addr_hints.ai_addr = NULL;
-        addr_hints.ai_canonname = NULL;
-        addr_hints.ai_next = NULL;
+        for(sa_family_t ai_family : std::vector<sa_family_t>{AF_INET, AF_INET6}) {
+            // 'converting' host/port in string to struct addrinfo
+            (void) memset(&addr_hints, 0, sizeof(struct addrinfo));
+            addr_hints.ai_family = ai_family;
+            addr_hints.ai_socktype = SOCK_DGRAM;
+            addr_hints.ai_protocol = IPPROTO_UDP;
+            addr_hints.ai_flags = 0;
+            addr_hints.ai_addrlen = 0;
+            addr_hints.ai_addr = NULL;
+            addr_hints.ai_canonname = NULL;
+            addr_hints.ai_next = NULL;
 
-        if (getaddrinfo(ip_string.c_str(), NULL, &addr_hints, &addr_result) == 0) {
-            address = std::make_shared<sockaddr_in>(sockaddr_in {});
+            if (getaddrinfo(ip_string.c_str(), NULL, &addr_hints, &addr_result) == 0) {
+                address = std::make_shared<sockaddr_in>(sockaddr_in {});
 
-            address->sin_family = AF_INET; // IPv4
-            address->sin_addr.s_addr = ((struct sockaddr_in *) (addr_result->ai_addr))->sin_addr.s_addr; // address IP
-            address->sin_port = htons(port);
-        } // port from the command line
+                address->sin_family = ai_family; // IPv4
+                address->sin_addr.s_addr = ((struct sockaddr_in *) (addr_result->ai_addr))->sin_addr.s_addr; // address IP
+                address->sin_port = htons(port);
 
-        freeaddrinfo(addr_result);
+                freeaddrinfo(addr_result);
+            }
+        }
+
+        if(address == nullptr) {
+            logs(addr, 2) << "getaddrinfo failed" << std::endl;
+        }
 
         return address;
     }
 
     // TODO move to IPv6 after test creation
-    std::shared_ptr<sockaddr_in> get_sockaddr() {
+    std::shared_ptr<sockaddr_in> get_sockaddr() const {
         return address;
     }
 
@@ -66,10 +73,26 @@ public:
      * @param address Address to be compared
      * @return True if they come from the same address
      */
-    bool same_socket(const IP & other_address) {
-        // TODO implement
-        (void) other_address;
-        return false;
+    bool same_socket(const IP & that) {
+        auto this_address = this->get_sockaddr();
+        auto that_address = that.get_sockaddr();
+
+        auto same_sock = this_address->sin_addr.s_addr == that_address->sin_addr.s_addr;
+        auto same_port = this_address->sin_port == that_address->sin_port;
+
+        return same_sock && same_port;
+    }
+
+    // Comparison between players is done between their usernames
+    bool operator <(const IP& that) {
+        auto this_address = this->get_sockaddr();
+        auto that_address = that.get_sockaddr();
+
+        if(this_address->sin_addr.s_addr < that_address->sin_addr.s_addr) return true;
+        else {
+            if(this_address->sin_addr.s_addr ==  that_address->sin_addr.s_addr) return this_address->sin_port < that_address->sin_port;
+            else return false;
+        }
     }
 
 private:

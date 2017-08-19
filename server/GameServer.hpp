@@ -21,7 +21,12 @@ public:
 
     // Comparison between players is done between their usernames
     bool operator <(const Player& other) {
-        return this->player_name < other.player_name;
+        std::cerr << "Comparing players" << std::endl;
+        if(this->player_name < other.player_name) return true;
+        else {
+            if(this->player_name == other.player_name) return this->address < other.address;
+            else return false;
+        }
     }
 
     IP get_address() {
@@ -35,7 +40,7 @@ using PlayerPtr = std::shared_ptr<Player>;
 template<typename T>
 struct PtrComp {
     bool operator()(std::shared_ptr<T> lhs, std::shared_ptr<T> rhs) const  {
-        return *lhs < *rhs;
+        return *lhs.get() < *rhs.get();
     }
 };
 
@@ -77,14 +82,14 @@ private:
     Additionally cleans the contact book from players with long inactivity time */
     /** Resolve player given their username and address
      *
-     * If the player doesn't exist, it creates one
+     * If the player doesn't exist, it creates one.
+     * It also updates the direction of the player if they are resolved.
      *
      * @param data
      * @return
      */
     PlayerPtr resolve_player(TimeoutSocket::socket_data data);
 
-    bool update_direction(PlayerPtr player, turn_dir_t direction);
 
     /** Calculates next iteration step of the game
      *
@@ -105,6 +110,13 @@ private:
      * @return
      */
     bool broadcast(ServerPackage package);
+
+    /** Predicate necessary to start game
+     *
+     * @return True if all connected players able to play pressed arrow key
+     * and there at least two of them.
+     */
+    bool can_start() const;
 
     std::map<PlayerPtr, turn_dir_t, PtrComp<Player>> player_directions;
 

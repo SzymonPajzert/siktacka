@@ -6,12 +6,13 @@
 #include "GameServer.hpp"
 
 void GameServer::run() {
-    logs_0 << "Server run" << std::endl;
+    logs(serv, 0) << "Server run" << std::endl;
     while(play_game()) {}
-    logs_0 << "Game stopped" << std::endl;
+    logs(serv, 0) << "Game stopped" << std::endl;
 }
 
 bool GameServer::play_game() {
+    logs(serv, 0) << "Play game called" << std::endl;
     if (!start_game()) {
         std::cerr << "Game cannot start - cannot collect players" << std::endl;
         return false;
@@ -40,16 +41,22 @@ bool GameServer::play_game() {
 
 
 PlayerPtr GameServer::resolve_player(TimeoutSocket::socket_data data) {
-    logs_1 << "resolve_player" << std::endl;
+    logs(serv, 1) << "resolve_player" << std::endl;
 
     auto player_address = std::get<0>(data);
     auto player_name = std::get<1>(data).player_name;
 
     PlayerPtr result = nullptr;
-    for(const auto player : connected_users) {
-        if (player->get_address().same_socket(player_address) and
-            player->player_name == player_name) {
+    for(const auto & player : connected_users) {
+        auto same_address = player->get_address().same_socket(player_address);
+        auto same_name = player->player_name == player_name;
 
+        logs(serv, 5)
+            << "Trying player '" << player->player_name << "' "
+            << "Same address(" << same_address << "), name(" << same_name << ")"
+            << std::endl;
+
+        if (same_address and same_name) {
             if (result != nullptr) failure("Indistinguishable users");
 
             result = player;
@@ -58,32 +65,68 @@ PlayerPtr GameServer::resolve_player(TimeoutSocket::socket_data data) {
 
     // If the user doesn't exist we have to create new one
     if(result == nullptr) {
-        logs_2 << "Creating new user: " << player_name << std::endl;
+        logs(serv, 2) << "Creating new user: " << player_name << std::endl;
+
+        // TODO consider putting everything into a separate add_player(...) since player instances are game dependent
         result = std::make_shared<Player>(Player { player_name, player_address });
+
+        connected_users.insert(result);
+    } else {
+        logs(serv, 3) << "Player already exists" << std::endl;
     }
+
+    // If player is successfully resolved, update their direction
+    if(result != nullptr) {
+        player_directions[result] = std::get<1>(data).turn_direction;
+    }
+
+
+    return result;
+}
+
+bool GameServer::can_start() const {
+    logs(serv, 6) << "Called can_start";
+
+    bool all_pressed = true;
+    size_t player_count = 0;
+
+    for(const auto & playerPtr : connected_users) {
+        if(!playerPtr->player_name.empty()) {
+            player_count++;
+            std::cerr << player_directions.size() << std::endl;
+            all_pressed = player_directions.at(playerPtr) != 0;
+            logs(serv, 7) << " " << all_pressed;
+            if(!all_pressed) break;
+        }
+    }
+
+    logs(serv, 6) << std::endl;
+
+    bool result = (all_pressed && player_count >= 2);
+    logs(serv, 4) << "Called can_start(" << result << ")" << std::endl;
 
     return result;
 }
 
 bool GameServer::start_game() {
-    while(connected_users.size() < 2) {
-        logs_2 << "In loop for start game" << std::endl;
+    while(!can_start()) {
+        logs(serv, 2) << "In loop for start game" << std::endl;
         // TODO probably process package or move processing to the receive next
         auto package = receive_next();
 
         if(package != nullptr) {
-            logs_2 << "Read client package" << std::endl;
+            logs(serv, 2) << "Read client package" << std::endl;
         }
     }
 
-    return false;
+    return initialize_map();
 }
 
 ServerPackage GameServer::get_from(event_no_t event_no) {
     std::vector<binary_t> interesting_events;
 
     for(auto it = events.find(event_no); it != events.end(); it++) {
-        logs_3 << "Serializing event no: " << it->first << std::endl;
+        logs(serv, 3) << "Serializing event no: " << it->first << std::endl;
         interesting_events.push_back(it->second);
     }
 
@@ -134,4 +177,7 @@ std::tuple<bool, ServerPackage> GameServer::calculate_step() {
     return std::make_tuple<bool, ServerPackage>(true, std::move(result));
 }
 
+bool GameServer::initialize_map() {
+    return false;
+}
 

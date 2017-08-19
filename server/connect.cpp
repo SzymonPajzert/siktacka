@@ -12,6 +12,7 @@ binary_t serialize<ClientPackage>(const ClientPackage &package) {
     binary_writer_t writer{TimeoutSocket::BUFFER_SIZE};
 
     bool result = true;
+
     result &= writer.write(host_to_net(package.session_id));
     result &= writer.write(host_to_net(package.turn_direction));
     result &= writer.write(host_to_net(package.next_expected_event_no));
@@ -40,15 +41,23 @@ maybe<ClientPackage> ClientPackage::read(binary_t data) {
 
     maybe<ClientPackage> result = nullptr;
     if (session_id && turn_direction && next_expected_event_no && player_name) {
-        logs_3 << "ClientPackage::read succeeded" << std::endl;
+        logs(comm, 3) << "ClientPackage::read succeeded" << std::endl;
         result = std::make_shared<ClientPackage>(ClientPackage {
                 *session_id,
                 *turn_direction,
                 *next_expected_event_no,
                 *player_name});
 
-        logs_4 << result->session_id << std::endl;
+        logs(comm, 4) << result->session_id << std::endl;
     }
+
+    if(reader->counter != data.length) {
+        logs(comm, 2) << "ClientPackage::read didn't read all the data ["
+                << reader->counter << "/" << data.length <<
+                "] - removing result" << std::endl;
+        result = nullptr;
+    }
+
     return result;
 }
 
@@ -74,7 +83,7 @@ int TimeoutSocket::get_sock(port_t port) {
 }
 
 maybe<std::tuple<IP, ClientPackage> > TimeoutSocket::receive() const {
-    logs_2 << "TimeoutSocket::receive()" << std::endl;
+    logs(comm, 4) << "TimeoutSocket::receive()" << std::endl;
 
     pollfd client[1];
     client[0].events = POLLIN;
@@ -113,24 +122,25 @@ maybe<std::tuple<IP, ClientPackage> > TimeoutSocket::receive() const {
             if (!byte_writer.move(static_cast<size_t>(len))) {
                 syserr("trying to write too much");
             }
-            logs_3 << "Read from socket: " << len << " bytes" << std::endl;
+            logs(comm, 3) << "Read from socket: " << len << " bytes" << std::endl;
         }
     }
 
-    logs_2 << "Finished exchange" << std::endl;
+    logs(comm, 4) << "Finished exchange" << std::endl;
 
     if(byte_writer.pointer > 0) {
         auto maybe_client_package = ClientPackage::read(byte_writer.save());
         if(maybe_client_package != nullptr) {
-            logs_1 << "Non trival client package read." << std::endl;
+            logs(comm, 2) << "Non trival client package read." << std::endl;
         }
         return map_maybe<ClientPackage, socket_data>
                 (maybe_client_package,
                  [client_address](auto client_package) -> auto {
+                     logs(comm, 3) << "Client package:(" << notstd::to_string(client_package) << ")" << std::endl;
                      return std::make_tuple(IP(client_address), client_package);
                  });
     } else {
-        logs_3 << "Nothing read from socket" << std::endl;
+        logs(comm, 4) << "Nothing read from socket" << std::endl;
     }
 
     return nullptr;

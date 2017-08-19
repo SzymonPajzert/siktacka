@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <endian.h>
+#include <map>
 #include "types.hpp"
 
 
@@ -117,7 +118,6 @@ maybe<A> bind_maybe(maybe<T> value, Func fun) {
     }
 }
 
-// TODO implement
 template<typename T>
 T host_to_net(T value) {
     constexpr size_t size = sizeof(T);
@@ -126,13 +126,21 @@ T host_to_net(T value) {
         case 2: return static_cast<T>(htobe16(value));
         case 4: return static_cast<T>(htobe32(value));
         case 8: return htobe64(value);
-        default: throw std::logic_error("Wrong size in host_to_net"); break;
+        default: throw std::logic_error("Wrong size in host_to_net");
     }
 }
 
-// TODO implement
 template<typename T>
-T net_to_host(T value);
+T net_to_host(T value) {
+    constexpr size_t size = sizeof(T);
+    switch(size){
+        case 1: return value;
+        case 2: return static_cast<T>(be16toh(value));
+        case 4: return static_cast<T>(be32toh(value));
+        case 8: return be64toh(value);
+        default: throw std::logic_error("Wrong size in host_to_net");
+    }
+}
 
 struct RandomSource {
     using value_t = int64_t;
@@ -151,14 +159,17 @@ private:
 };
 
 extern std::ostream null;
-extern std::ostream & logs_0;
-extern std::ostream & logs_1;
-extern std::ostream & logs_2;
-extern std::ostream & logs_3;
-extern std::ostream & logs_4;
 
+enum part_t {
+    comm,
+    serv,
+    addr,
+    binary,
+};
 
+extern std::map<part_t, int> max_log_level;
 
+std::ostream & logs(part_t part, int level);
 
 inline void syserr(const std::string & message) {
     // TODO add errno interpretation
@@ -169,6 +180,18 @@ inline void syserr(const std::string & message) {
 inline void failure(const std::string & message) {
     std::cerr << message << std::endl;
     exit(1);
+}
+
+inline void print_bytes(const void *object, size_t size) {
+    auto * const bytes = static_cast<const unsigned char *>(object);
+    size_t i;
+
+    printf("[ ");
+    for(i = 0; i < size; i++)
+    {
+        printf("%02x ", bytes[i]);
+    }
+    printf("]\n");
 }
 
 

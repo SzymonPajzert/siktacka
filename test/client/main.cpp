@@ -7,6 +7,8 @@
 #include "parse/parser.hpp"
 #include "server/connect.hpp"
 
+std::map<part_t, int> max_log_level {{comm, 1}, {serv, 1}, {addr, 1}, {binary,1}};
+
 enum dir_t {
     left = -1,
     forward = 0,
@@ -16,9 +18,13 @@ enum dir_t {
 std::shared_ptr<client_param> params;
 
 void send_update(sock_t sock, dir_t dir) {
+    std::cerr << "Updating for direction: " << (int)dir << std::endl;
+
     sockaddr_in * server = params->server_address.get_sockaddr().get();
 
-    auto package = ClientPackage { 0, dir, 0, std::string {"player"} };
+    auto package = ClientPackage { 10, dir, 200, std::string {"player"} };
+    // TODO remove
+    print_bytes(&package, 20);
     auto serialized = serialize<ClientPackage>(package);
 
     int sflags = 0;
@@ -35,7 +41,6 @@ int main(int argc, char* argv[]) {
 
     const sock_t sock = socket(PF_INET, SOCK_DGRAM, 0);
 
-
     bool go_on = true;
     while(go_on) {
         std::cout << "Direction: ";
@@ -50,6 +55,7 @@ int main(int argc, char* argv[]) {
             default: break;
         }
 
+        std::cerr << "dir: " << (int) dir;
         send_update(sock, dir);
     }
 

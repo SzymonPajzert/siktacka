@@ -36,7 +36,7 @@ include_directories(.)
 set(SHARED_SOURCE_FILES
         def/ipaddr.hpp
         def/types.hpp
-        parse/parser.hpp def/util.hpp parse/parser.cpp def/types.cpp def/util.cpp)
+        parse/parser.hpp def/util.hpp parse/parser.cpp def/util.cpp def/binary.cpp def/binary.hpp)
 
 
 set(SERVER_SOURCE_FILES
@@ -51,12 +51,15 @@ set(CLIENT_SOURCE_FILES
 add_executable(siktacka-client ${CLIENT_SOURCE_FILES})
 
 set(UNIT_TEST_FILES
-        test/main.cpp)
+        ${SHARED_SOURCE_FILES}
+        server/connect.hpp server/connect.cpp
+        def/util.cpp
+        test/main.cpp test/serialization.hpp test/Test.cpp test/Test.hpp test/ip_parsing.hpp)
 add_executable(unit-test ${UNIT_TEST_FILES})
 
 set(CLIENT_STUB_FILES
         def/util.cpp
-        def/types.cpp
+        ${SHARED_SOURCE_FILES}
         server/connect.cpp
         parse/parser.cpp
         parse/parser.hpp
