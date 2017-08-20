@@ -19,16 +19,14 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O -Wall -Weffc++ -pedantic  \
     -Wredundant-decls -Wreturn-type -Wreorder \
     -Wsequence-point  -Wshadow -Wsign-compare  -Wstack-protector \
     -Wstrict-aliasing -Wstrict-aliasing=2 -Wswitch  -Wswitch-default \
-    -Wswitch-enum -Wtrigraphs -Wno-uninitialized \
+    -Wswitch-enum -Wtrigraphs -Wuninitialized \
     -Wunknown-pragmas  -Wunreachable-code -Wunused \
     -Wunused-function  -Wunused-label  -Wunused-parameter \
     -Wunused-value  -Wunused-variable  -Wvariadic-macros \
     -Wvolatile-register-var  -Wwrite-strings")
 
-# TODO -Wuninitialized
-# TODO -Wconversion
-# TODO add -Wpadded
-# TODO add -Winline -Wno-error=inline
+# TODO(maybe) add -Wpadded, add -Wconversion
+# TODO(maybe) add -Winline
 # -Waggregate-return - this flag is not useful
 
 include_directories(.)
@@ -36,7 +34,7 @@ include_directories(.)
 set(SHARED_SOURCE_FILES
         def/ipaddr.hpp
         def/types.hpp
-        parse/parser.hpp def/util.hpp parse/parser.cpp def/util.cpp def/binary.cpp def/binary.hpp)
+        parse/parser.hpp def/util.hpp parse/parser.cpp def/util.cpp def/binary.cpp def/binary.hpp def/config.hpp)
 
 
 set(SERVER_SOURCE_FILES

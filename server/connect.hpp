@@ -47,7 +47,7 @@ struct ClientPackage {
 };
 
 namespace notstd {
-    // TODO move
+    // TODO(maybe) move
     inline std::string to_string(const ClientPackage& package) {
         std::stringstream result;
         result
@@ -97,9 +97,6 @@ public:
 
     timeout_t timeout; //< timeout after which we'll stop waiting for the messages
     const sock_t sock;
-
-    // TODO fetch the size from the outside config
-    static const size_t BUFFER_SIZE = 512;
 };
 
 

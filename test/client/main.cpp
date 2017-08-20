@@ -7,7 +7,7 @@
 #include "parse/parser.hpp"
 #include "server/connect.hpp"
 
-std::map<part_t, int> max_log_level {{comm, 1}, {serv, 1}, {addr, 1}, {binary,1}};
+std::map<part_t, int> max_log_level {{comm, -1}, {serv, -1}, {addr, -1}, {binary,-1}};
 
 enum dir_t {
     left = -1,
@@ -22,9 +22,8 @@ void send_update(sock_t sock, dir_t dir) {
 
     sockaddr_in * server = params->server_address.get_sockaddr().get();
 
-    auto package = ClientPackage { 10, dir, 200, std::string {"player"} };
-    // TODO remove
-    print_bytes(&package, 20);
+    auto package = ClientPackage { 10, dir, 200, params->player_name };
+
     auto serialized = serialize<ClientPackage>(package);
 
     int sflags = 0;

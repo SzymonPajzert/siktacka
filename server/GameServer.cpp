@@ -71,7 +71,7 @@ PlayerPtr GameServer::resolve_player(TimeoutSocket::socket_data data) {
     if(result == nullptr) {
         logs(serv, 2) << "Creating new user: " << player_name << std::endl;
 
-        // TODO consider putting everything into a separate add_player(...) since player instances are game dependent
+        // TODO(maybe) consider putting everything into a separate add_player(...) since player instances are game dependent
         result = std::make_shared<Player>(Player { player_name, player_address });
 
         connected_users.insert(result);
@@ -119,7 +119,7 @@ bool GameServer::game_finished() const {
 bool GameServer::start_game() {
     while(!can_start()) {
         logs(serv, 2) << "In loop for start game" << std::endl;
-        // TODO probably process package or move processing to the receive next
+
         auto package = receive_next();
 
         if(package != nullptr) {
@@ -133,7 +133,6 @@ bool GameServer::start_game() {
 ServerPackage GameServer::get_from(event_no_t event_no) const {
     std::vector<binary_t> interesting_events;
 
-    // TODO rewrite as transformation
     for(size_t it = event_no; it < events.size(); it++) {
         logs(serv, 3) << "Serializing event no: " << it << std::endl;
         interesting_events.push_back(events[it]);
@@ -143,7 +142,7 @@ ServerPackage GameServer::get_from(event_no_t event_no) const {
 
     // TODO create big utility adding the binaries together
     auto new_writer = [this]() -> auto {
-        binary_writer_t writer {TimeoutSocket::BUFFER_SIZE};
+        binary_writer_t writer { config::BUFFER_SIZE };
         if(!writer.write(this->game_id)) {
             failure("Failed writing to the buffer");
         }
@@ -190,6 +189,7 @@ std::tuple<bool, ServerPackage> GameServer::calculate_step() {
     return std::make_tuple<bool, ServerPackage>(game_finished(), std::move(new_actions));
 }
 
+// TODO fail if putting head out of bounds
 void GameServer::move_head(PlayerPtr player) {
     logs(serv, 3) << "Move head" << std::endl;
     auto position = head_positions[player];

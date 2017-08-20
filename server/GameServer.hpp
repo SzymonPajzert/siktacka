@@ -8,6 +8,7 @@
 #include <map>
 #include <set>
 #include <cmath>
+#include <def/config.hpp>
 #include "parse/parser.hpp"
 #include "connect.hpp"
 
@@ -135,7 +136,6 @@ private:
 
     /** Calculates next iteration step of the game
      *
-     * TODO
      * @return Returns whether the game is still going and server data to be sent to every connected user
      */
     std::tuple<bool, ServerPackage> calculate_step();
@@ -187,7 +187,7 @@ private:
         logs(serv, 3) << "generate: new_game" << std::endl;
         auto event = get_new_event_no();
 
-        binary_writer_t writer { TimeoutSocket::BUFFER_SIZE };
+        binary_writer_t writer { config::BUFFER_SIZE };
         bool success = true;
         success = success and writer.write(host_to_net(event));
         success = success and writer.write(host_to_net(GameServer::NEW_GAME));
@@ -218,7 +218,7 @@ private:
         logs(serv, 3) << "generate: pixel" << std::endl;
         auto event = get_new_event_no();
 
-        binary_writer_t writer { TimeoutSocket::BUFFER_SIZE };
+        binary_writer_t writer { config::BUFFER_SIZE };
         bool success = true;
         success = success and writer.write(host_to_net(event));
         success = success and writer.write(host_to_net(GameServer::PIXEL));
@@ -237,7 +237,7 @@ private:
         logs(serv, 3) << "generate: player_eliminated" << std::endl;
         auto event = get_new_event_no();
 
-        binary_writer_t writer { TimeoutSocket::BUFFER_SIZE };
+        binary_writer_t writer { config::BUFFER_SIZE };
         bool success = true;
         success = success and writer.write(host_to_net(event));
         success = success and writer.write(host_to_net(GameServer::PLAYER_ELIMINATED));

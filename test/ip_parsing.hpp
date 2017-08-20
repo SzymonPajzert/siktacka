@@ -49,7 +49,6 @@ Test test_ip_parsing() {
 
     std::cout << "Size of the parseable without port: " << parseable_without_port.size() << std::endl;
 
-    // TODO move to separate function
     std::cout << std::endl << "Checking parseable with port" << std::endl;
     for(const auto &address : parseable) {
         std::cout << "Parsing: " << address << " " << std::flush;

@@ -137,7 +137,7 @@ T net_to_host(T value) {
         case 1: return value;
         case 2: return static_cast<T>(be16toh(value));
         case 4: return static_cast<T>(be32toh(value));
-        case 8: return be64toh(value);
+        case 8: return static_cast<T>(be64toh(value));
         default: throw std::logic_error("Wrong size in host_to_net");
     }
 }

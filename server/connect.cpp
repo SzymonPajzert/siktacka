@@ -5,11 +5,12 @@
 #include <parse/parser.hpp>
 #include <netinet/in.h>
 #include <poll.h>
+#include <def/config.hpp>
 #include "connect.hpp"
 
 template<>
 binary_t serialize<ClientPackage>(const ClientPackage &package) {
-    binary_writer_t writer{TimeoutSocket::BUFFER_SIZE};
+    binary_writer_t writer{config::BUFFER_SIZE};
 
     bool result = true;
 
@@ -91,7 +92,7 @@ maybe<std::tuple<IP, ClientPackage> > TimeoutSocket::receive() const {
 
     sockaddr_in client_address{};
 
-    binary_writer_t byte_writer{TimeoutSocket::BUFFER_SIZE};
+    binary_writer_t byte_writer{config::BUFFER_SIZE};
 
     ssize_t ret;
 
