@@ -156,8 +156,12 @@ bool TimeoutSocket::send(IP address, ServerPackage packages) {
         ssize_t snd_len = sendto(sock, package.bytes.get(), package.length, sflags,
                                  (struct sockaddr *) &client_address, snda_len);
 
-        if (snd_len < 0 or static_cast<size_t>(snd_len) != package.length)
-            syserr("error on sending datagram to client socket");
+        if (snd_len < 0) {
+            syserr("TimeoutSocket::send: error on sending datagram to client socket");
+        }
+        if(static_cast<size_t>(snd_len) != package.length) {
+            syserr("TimeoutSocket::send: error on sending datagram to client socket");
+        }
     }
 
 

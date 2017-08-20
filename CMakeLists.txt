@@ -10,9 +10,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O -Wall -Weffc++ -pedantic  \
     -Werror -Wfloat-equal  -Wformat  -Wformat=2 \
     -Wformat-nonliteral -Wformat-security  \
     -Wformat-y2k \
-    -Wimport  -Winit-self \
-    -Winvalid-pch   \
-    -Wunsafe-loop-optimizations  -Wlong-long -Wmissing-braces \
+    -Wimport  -Winit-self -Winvalid-pch \
+    -Wunsafe-loop-optimizations  -Wlong-long \
+    -Wmaybe-uninitialized -Wmissing-braces \
     -Wmissing-field-initializers -Wmissing-format-attribute   \
     -Wmissing-include-dirs -Wmissing-noreturn \
     -Wpacked -Wparentheses  -Wpointer-arith \

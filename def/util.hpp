@@ -174,6 +174,7 @@ std::ostream & logs(part_t part, int level);
 inline void syserr(const std::string & message) {
     // TODO add errno interpretation
     std::cerr << message << std::endl;
+    std::cerr << errno << ": " << strerror(errno) << std::endl;
     exit(1);
 }
 

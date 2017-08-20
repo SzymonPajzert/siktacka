@@ -20,8 +20,10 @@ bool GameServer::play_game() {
 
     bool play_game = true;
     while(play_game) {
-        maybe<PlayerPackage> read_command;
-        while (read_command = receive_next()) {
+        logs(serv, 3) << "In play_game loop" << std::endl;
+        maybe<PlayerPackage> read_command = nullptr;
+        while ((read_command = receive_next()) != nullptr) {
+            logs(serv, 5) << "Received nonempty command";
             map_maybe_(read_command, [this](PlayerPackage command) -> void {
                 auto event_no = command.package.next_expected_event_no;
                 auto package = get_from(event_no);
@@ -32,7 +34,9 @@ bool GameServer::play_game() {
         // We got timeouted and have to process the next step
         auto calculate_result = calculate_step();
         play_game = !std::get<0>(calculate_result);
-        ServerPackage next_action = std::get<1>(calculate_result);
+        ServerPackage next_action = std::move(std::get<1>(calculate_result));
+
+        broadcast(next_action);
     }
 
     return true;
@@ -108,6 +112,10 @@ bool GameServer::can_start() const {
     return result;
 }
 
+bool GameServer::game_finished() const {
+    return player_directions.size() == 1 and head_directions.size() == 1 and head_positions.size() == 1;
+}
+
 bool GameServer::start_game() {
     while(!can_start()) {
         logs(serv, 2) << "In loop for start game" << std::endl;
@@ -122,17 +130,18 @@ bool GameServer::start_game() {
     return initialize_map();
 }
 
-ServerPackage GameServer::get_from(event_no_t event_no) {
+ServerPackage GameServer::get_from(event_no_t event_no) const {
     std::vector<binary_t> interesting_events;
 
-    for(auto it = events.find(event_no); it != events.end(); it++) {
-        logs(serv, 3) << "Serializing event no: " << it->first << std::endl;
-        interesting_events.push_back(it->second);
+    // TODO rewrite as transformation
+    for(size_t it = event_no; it < events.size(); it++) {
+        logs(serv, 3) << "Serializing event no: " << it << std::endl;
+        interesting_events.push_back(events[it]);
     }
 
     std::vector<binary_t> serialized_events {};
 
-    // TODO move to the method namespace since calculate step needs it as well
+    // TODO create big utility adding the binaries together
     auto new_writer = [this]() -> auto {
         binary_writer_t writer {TimeoutSocket::BUFFER_SIZE};
         if(!writer.write(this->game_id)) {
@@ -165,19 +174,73 @@ maybe<PlayerPackage> GameServer::receive_next() {
 }
 
 std::tuple<bool, ServerPackage> GameServer::calculate_step() {
-    // TODO implement
-    binary_writer_t writer { TimeoutSocket::BUFFER_SIZE };
-    if(!writer.write("No elo ziomki")) {
-        failure("Writer failed.");
+    logs(serv, 2) << "Calculate next step - len(player_directions) == " << player_directions.size() << std::endl;
+    auto new_action_id = get_new_event_no();
+
+    for(auto player_dir : player_directions) {
+        auto player = player_dir.first;
+        auto direction = player_dir.second;
+
+        head_directions[player].turn(direction, params.turning);
+
+        move_head(player);
     }
 
-    std::vector<binary_t> result;
-    result.push_back(writer.save());
+    auto new_actions = get_from(new_action_id);
+    return std::make_tuple<bool, ServerPackage>(game_finished(), std::move(new_actions));
+}
 
-    return std::make_tuple<bool, ServerPackage>(true, std::move(result));
+void GameServer::move_head(PlayerPtr player) {
+    logs(serv, 3) << "Move head" << std::endl;
+    auto position = head_positions[player];
+    auto new_position = position.move(head_directions[player]);
+
+    bool player_playing = true;
+    if(not new_position.disc_equal(position)) {
+        player_playing = try_put_pixel(player, new_position.to_disc());
+    }
+
+    if(player_playing) {
+        head_positions[player] = new_position;
+    }
 }
 
 bool GameServer::initialize_map() {
-    return false;
+    logs(serv, 1) << "Initializing map" << std::endl;
+
+    game_id = static_cast<game_id_t>(random_source.get_next());
+
+    generate_new_game();
+
+    player_id_t current_id = 0;
+
+    for(auto player_dir : player_directions) {
+        auto player = player_dir.first;
+
+        // Initialize player id
+        player_ids[player] = current_id++;
+
+        auto x = random_source.get_next() % params.width + 0.5;
+        auto y = random_source.get_next() % params.height + 0.5;
+        if(try_put_pixel(player, std::make_pair(x, y))) {
+            head_directions[player] = angle_t { static_cast<int>(random_source.get_next() % 360) };
+        }
+    }
+
+    return true;
+}
+
+bool GameServer::try_put_pixel(PlayerPtr player, disc_position_t position) {
+    bool result;
+
+    if(occupied_positions.find(position) == occupied_positions.end()) {
+        generate_pixel(player, position);
+        result = true;
+    } else {
+        generate_player_eliminated(player);
+        result = false;
+    }
+
+    return result;
 }
 

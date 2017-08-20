@@ -44,7 +44,7 @@ int main(int argc, char* argv[]) {
     bool go_on = true;
     while(go_on) {
         std::cout << "Direction: ";
-        dir_t dir;
+        dir_t dir = forward;
         char c;
         std::cin >> c;
         switch(c) {
