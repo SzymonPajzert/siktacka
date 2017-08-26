@@ -10,58 +10,7 @@
 #include <vector>
 #include <def/binary.hpp>
 #include <sstream>
-
-#include "types.hpp"
-
-/** Class implementing package from client
- *
- * Allows reading from binary form to deserialize the data
- *
- */
-struct ClientPackage {
-    using session_t = uint64_t;
-
-    session_t session_id {};
-    turn_dir_t turn_direction {};
-    event_no_t next_expected_event_no {};
-    std::string player_name;
-
-
-    /** Read the data and possibly return the client communicate
-     *
-     * Performs additional conversion from network to host byte order
-     *
-     * @param data Data to be parsed
-     * @return Maybe proper client package
-     */
-    static maybe<ClientPackage> read(binary_t data);
-
-    bool operator==(const ClientPackage& that) const{
-        return
-            (this->session_id == that.session_id) and
-            (this->turn_direction == that.turn_direction) and
-            (this->next_expected_event_no == that.next_expected_event_no) and
-            (this->player_name == that.player_name);
-    }
-
-};
-
-namespace notstd {
-    // TODO(maybe) move
-    inline std::string to_string(const ClientPackage& package) {
-        std::stringstream result;
-        result
-                << package.session_id << " "
-                << (int) package.turn_direction << " "
-                << package.next_expected_event_no << " "
-                << "'" << package.player_name << "'" ;
-
-        return result.str();
-    }
-}
-
-template<>
-binary_t serialize<ClientPackage>(const ClientPackage & package);
+#include <conn/ClientPackage.hpp>
 
 /// Data sent from the server
 using ServerPackage = std::vector<binary_t>;

@@ -8,6 +8,7 @@
 #include <cstdio>
 
 struct config {
+    // TODO remove it and add smaller versions per usage (etc. 508 for event_data)
     static constexpr size_t BUFFER_SIZE = 512;
 };
 

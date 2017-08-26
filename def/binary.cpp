@@ -4,19 +4,12 @@
 
 #include "binary.hpp"
 
+void binary_writer_t::write_bytes(binary_t data) {
+    ok = size_left() >= data.length;
 
-std::shared_ptr<binary_reader_t> binary_t::reader() {
-    return std::make_shared<binary_reader_t>(binary_reader_t(*this));
-}
-
-bool binary_writer_t::write_bytes(binary_t data) {
-    bool result = size_left() >= data.length;
-
-    if (result) {
+    if (ok) {
         memcpy(get(), data.bytes.get(), data.length);
     }
-
-    return result;
 }
 
 binary_t binary_writer_t::save() const {

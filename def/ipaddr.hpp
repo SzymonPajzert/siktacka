@@ -57,7 +57,7 @@ public:
         }
 
         if(address == nullptr) {
-            logs(addr, 2) << "getaddrinfo failed" << std::endl;
+            logs(addr, 3) << "getaddrinfo failed" << std::endl;
         }
 
         return address;

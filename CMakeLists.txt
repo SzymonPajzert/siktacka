@@ -34,7 +34,7 @@ include_directories(.)
 set(SHARED_SOURCE_FILES
         def/ipaddr.hpp
         def/types.hpp
-        parse/parser.hpp def/util.hpp parse/parser.cpp def/util.cpp def/binary.cpp def/binary.hpp def/config.hpp)
+        parse/parser.hpp def/util.hpp parse/parser.cpp def/util.cpp def/binary.cpp def/binary.hpp def/config.hpp conn/ClientPackage.hpp conn/ClientPackage.cpp)
 
 
 set(SERVER_SOURCE_FILES
@@ -44,9 +44,10 @@ set(SERVER_SOURCE_FILES
 add_executable(siktacka-server ${SERVER_SOURCE_FILES})
 
 set(CLIENT_SOURCE_FILES
-        client/main.cpp
-        ${SHARED_SOURCE_FILES})
-add_executable(siktacka-client ${CLIENT_SOURCE_FILES})
+        ${SHARED_SOURCE_FILES} client/GameClient.cpp client/GameClient.hpp client/GUIConnection.cpp client/GUIConnection.hpp client/ServerConnection.cpp client/ServerConnection.hpp client/AwaitableSocket.hpp)
+add_executable(siktacka-client
+        ${CLIENT_SOURCE_FILES}
+        client/main.cpp)
 
 set(UNIT_TEST_FILES
         ${SHARED_SOURCE_FILES}
@@ -61,5 +62,14 @@ set(CLIENT_STUB_FILES
         server/connect.cpp
         parse/parser.cpp
         parse/parser.hpp
-        test/client/main.cpp)
+        test/client-stub/main.cpp)
 add_executable(client-stub ${CLIENT_STUB_FILES})
+
+set(GUI_STUB_FILES
+        ${SHARED_SOURCE_FILES}
+        ${CLIENT_SOURCE_FILES}
+        test/gui-stub/main.cpp)
+add_executable(gui-stub ${GUI_STUB_FILES})
+
+
+target_link_libraries(siktacka-server z)

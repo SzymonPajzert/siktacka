@@ -3,17 +3,12 @@
 //
 
 #include <unistd.h>
+#include <conn/ClientPackage.hpp>
 
 #include "parse/parser.hpp"
 #include "server/connect.hpp"
 
 std::map<part_t, int> max_log_level {{comm, -1}, {serv, -1}, {addr, -1}, {binary,-1}};
-
-enum dir_t {
-    left = -1,
-    forward = 0,
-    right = 1
-};
 
 std::shared_ptr<client_param> params;
 

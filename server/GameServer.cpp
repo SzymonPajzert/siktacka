@@ -123,12 +123,13 @@ bool GameServer::start_game() {
         auto package = receive_next();
 
         if(package != nullptr) {
-            logs(serv, 2) << "Read client package" << std::endl;
+            logs(serv, 2) << "Read client-stub package" << std::endl;
         }
     }
 
     return initialize_map();
 }
+
 
 ServerPackage GameServer::get_from(event_no_t event_no) const {
     std::vector<binary_t> interesting_events;
@@ -143,7 +144,9 @@ ServerPackage GameServer::get_from(event_no_t event_no) const {
     // TODO create big utility adding the binaries together
     auto new_writer = [this]() -> auto {
         binary_writer_t writer { config::BUFFER_SIZE };
-        if(!writer.write(this->game_id)) {
+        writer.write(this->game_id);
+
+        if(!writer.is_ok()) {
             failure("Failed writing to the buffer");
         }
         return writer;
@@ -156,7 +159,8 @@ ServerPackage GameServer::get_from(event_no_t event_no) const {
             writer = new_writer();
         }
 
-        if(!writer.write_bytes(event)) {
+        writer.write_bytes(event);
+        if(!writer.is_ok()) {
             failure("Failed writing to the buffer");
         }
     }

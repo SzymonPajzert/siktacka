@@ -56,7 +56,12 @@ maybe<T> parse_int(const std::string & int_string) {
 
 constexpr void * unit = nullptr;
 template <typename T>
-constexpr maybe<T> nothing = nullptr;
+inline maybe<T> just(T x) {
+    return std::make_shared<T>(x);
+}
+
+template <typename T>
+const maybe<T> nothing = nullptr;
 
 template<typename T>
 T id(T x) {
@@ -165,20 +170,21 @@ enum part_t {
     serv,
     addr,
     binary,
+    client,
 };
 
 extern std::map<part_t, int> max_log_level;
 
-std::ostream & logs(part_t part, int level);
+std::ostream & logs(part_t part, int level, bool indent=true);
 
-inline void syserr(const std::string & message) {
+inline void NO_RETURN syserr(const std::string & message) {
     // TODO add errno interpretation
     std::cerr << message << std::endl;
     std::cerr << errno << ": " << strerror(errno) << std::endl;
     exit(1);
 }
 
-inline void failure(const std::string & message) {
+inline void NO_RETURN failure(const std::string & message) {
     std::cerr << message << std::endl;
     exit(1);
 }
@@ -188,8 +194,7 @@ inline void print_bytes(const void *object, size_t size) {
     size_t i;
 
     printf("[ ");
-    for(i = 0; i < size; i++)
-    {
+    for(i = 0; i < size; i++) {
         printf("%02x ", bytes[i]);
     }
     printf("]\n");

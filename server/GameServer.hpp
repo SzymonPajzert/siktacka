@@ -9,6 +9,8 @@
 #include <set>
 #include <cmath>
 #include <def/config.hpp>
+#include <zlib.h>
+#include <conn/ClientPackage.hpp>
 #include "parse/parser.hpp"
 #include "connect.hpp"
 
@@ -171,42 +173,69 @@ private:
 
 
     /*                         GAME MANAGEMENT                             */
-    using event_type_t = int8_t;
     using player_id_t = uint8_t;
 
     player_id_t get_player_id(PlayerPtr player) const {
         return player_ids.at(player);
     }
 
-    static const event_type_t NEW_GAME = 0;
-    static const event_type_t PIXEL = 1;
-    static const event_type_t PLAYER_ELIMINATED = 2;
-    static const event_type_t GAME_OVER = 3;
+    /**
+     *
+     * @param event_data
+     * @return Size of the encapsulated data
+     */
+    // TODO check the return size and assert it for constant lengths
+    uint32_t WARN_UNUSED encaps_write_event(binary_t event_data) {
+        // TODO add this type to types
+        auto len = static_cast<uint32_t>(event_data.length + 4 + 4); // len field + crc32;
+
+        binary_writer_t writer { config::BUFFER_SIZE };
+        writer.write<uint32_t>(len);
+        writer.write_bytes(event_data);
+
+        uLong crc = crc32(0L, Z_NULL, 0);
+        crc = crc32(crc, (const unsigned char*)&len, sizeof(len));
+        crc = crc32(crc, event_data.bytes.get(), static_cast<uInt>(event_data.length));
+
+        writer.write<uint32_t>(static_cast<uint32_t>(crc));
+
+        if(writer.is_ok()) {
+            events.push_back(writer.save());
+        } else {
+            failure("Writer failed");
+        }
+
+
+
+        return len;
+    }
 
     void generate_new_game() {
         logs(serv, 3) << "generate: new_game" << std::endl;
         auto event = get_new_event_no();
 
         binary_writer_t writer { config::BUFFER_SIZE };
-        bool success = true;
-        success = success and writer.write(host_to_net(event));
-        success = success and writer.write(host_to_net(GameServer::NEW_GAME));
-        success = success and writer.write(host_to_net(params.width));
-        success = success and writer.write(host_to_net(params.height));
 
-        if(success) {
+        writer.write(host_to_net(event));
+        writer.write(host_to_net(NEW_GAME));
+        writer.write(host_to_net(params.width));
+        writer.write(host_to_net(params.height));
+
+        if(writer.is_ok()) {
             for(auto player_dir : player_directions) {
                 auto player = player_dir.first;
-                success = success and writer.write(player->player_name);
-                success = success and writer.write('\0');
+                writer.write(player->player_name);
+                writer.write('\0');
             }
         }
 
-        if(!success) {
+        if(!writer.is_ok()) {
             failure("writing in generate_new_game failed");
         }
 
-        events.push_back(writer.save());
+        // TODO calculate
+        auto result = encaps_write_event(writer.save());
+        (void) result;
     }
 
     /** Generate pixel by player and additionally signal its occupancy in the server logic.
@@ -219,18 +248,20 @@ private:
         auto event = get_new_event_no();
 
         binary_writer_t writer { config::BUFFER_SIZE };
-        bool success = true;
-        success = success and writer.write(host_to_net(event));
-        success = success and writer.write(host_to_net(GameServer::PIXEL));
-        success = success and writer.write(host_to_net<uint8_t>(get_player_id(player)));
-        success = success and writer.write(host_to_net(position.first));
-        success = success and writer.write(host_to_net(position.second));
 
-        if(!success) {
+        writer.write(host_to_net(event));
+        writer.write(host_to_net(PIXEL));
+        writer.write(host_to_net<uint8_t>(get_player_id(player)));
+        writer.write(host_to_net(position.first));
+        writer.write(host_to_net(position.second));
+
+        if(!writer.is_ok()) {
             failure("writing in generate_pixel failed");
         }
 
-        events.push_back(writer.save());
+        if(encaps_write_event(writer.save()) != 4+4+1+(1+4+4)+4) {
+            failure("generate_pixel - number of bytes written is wrong");
+        }
     }
 
     void generate_player_eliminated(PlayerPtr player) {
@@ -238,16 +269,17 @@ private:
         auto event = get_new_event_no();
 
         binary_writer_t writer { config::BUFFER_SIZE };
-        bool success = true;
-        success = success and writer.write(host_to_net(event));
-        success = success and writer.write(host_to_net(GameServer::PLAYER_ELIMINATED));
-        success = success and writer.write(host_to_net<uint8_t>(get_player_id(player)));
+        writer.write(host_to_net(event));
+        writer.write(host_to_net(PLAYER_ELIMINATED));
+        writer.write(host_to_net<uint8_t>(get_player_id(player)));
 
-        if(!success) {
+        if(!writer.is_ok()) {
             failure("writing in generate_new_game failed");
         }
 
-        events.push_back(writer.save());
+        if(encaps_write_event(writer.save()) != 4+4+1+(1)+4) {
+
+        }
     }
 
     void game_over();

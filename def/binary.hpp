@@ -20,29 +20,46 @@ struct binary_t {
     std::shared_ptr<byte_t> bytes;
     const size_t length;
 
-    std::shared_ptr<binary_reader_t> reader();
-
     bool operator==(const binary_t& that) {
         return this->length == that.length and (memcmp(this->bytes.get(), that.bytes.get(), this->length) == 0);
     }
 };
 
+enum data_source_t {
+    net, host
+};
+
 struct binary_reader_t {
     binary_t data;
     size_t counter;
+    data_source_t data_source;
 
-    explicit binary_reader_t(binary_t _data) : data(std::move(_data)), counter(0) {};
+    explicit binary_reader_t(
+            binary_t _data,
+            data_source_t _data_source,
+            bool fail=true)
+            : data(std::move(_data))
+            , counter(0)
+            , data_source(_data_source) {
+
+        // TODO implement behaviour fail prone and set to true by default
+        (void) fail;
+    };
 
     template <typename T>
     maybe<T> read() {
         constexpr auto size = sizeof(T);
         if(counter + size <= data.length) {
             T value;
-            char * source = data.bytes.get() + counter;
+            byte_t* source = data.bytes.get() + counter;
             memcpy(&value, source, size);
             counter += size;
 
-            value = net_to_host<T>(value);
+            switch (data_source) {
+                case net : value = net_to_host<T>(value); break;
+                case host: value = host_to_net<T>(value); break;
+                default: break;
+            }
 
             return std::make_shared<T>(value);
         } else {
@@ -68,6 +85,10 @@ struct binary_reader_t {
 
         return result;
     }
+
+    size_t unread_size() const {
+        return data.length - counter;
+    }
 };
 
 
@@ -76,7 +97,8 @@ struct binary_writer_t {
     explicit binary_writer_t(size_t _max_size)
             : max_size(_max_size)
             , pointer(0)
-            , bytes((char*) malloc(max_size))
+            , bytes((byte_t*) malloc(max_size))
+            , ok(true)
     {}
 
     size_t size_left() {
@@ -95,7 +117,7 @@ struct binary_writer_t {
 
     // TODO store result in internal state, assume that writing never fails
     template<typename T>
-    bool WARN_UNUSED write(T value) {
+    void write(T value) {
         constexpr auto size = sizeof(T);
         bool can_write = size_left() >= size;
 
@@ -104,19 +126,16 @@ struct binary_writer_t {
             pointer += size;
         }
 
-        return can_write;
+        ok = ok and can_write;
     }
 
-    bool WARN_UNUSED write(const std::string & string) {
-        bool result = true;
+    void write(const std::string & string) {
         for(auto c : string) {
-            result = write<char>(c);
-            if(!result) break;
+            write<char>(c);
+            if(!is_ok()) break;
         }
         // Check how strings should end
-        result = result && write<char>('\0');
-
-        return result;
+        write<char>('\0');
     }
 
     /** Writes binary data to the buffer
@@ -124,11 +143,21 @@ struct binary_writer_t {
      * @param data Data to be written
      * @return True if data fit into the memory
      */
-    bool WARN_UNUSED write_bytes(binary_t data);
+    void write_bytes(binary_t data);
 
+    bool is_ok() const {
+        return ok;
+    }
+
+    size_t get_pointer() const {
+        return pointer;
+    };
+
+private:
     size_t max_size;
     size_t pointer;
     std::shared_ptr<byte_t> bytes;
+    bool ok;
 };
 
 template <typename T>
