@@ -10,6 +10,7 @@
 struct config {
     // TODO remove it and add smaller versions per usage (etc. 508 for event_data)
     static constexpr size_t BUFFER_SIZE = 512;
+    static constexpr int client_update_timeout = 20;
 };
 
 #endif //SIKTACKA_CONFIG_HPP

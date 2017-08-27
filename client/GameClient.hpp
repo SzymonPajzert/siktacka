@@ -31,15 +31,14 @@ public:
 
         bool keep_going = true;
         while(keep_going) {
-            bool direction_changed = false;
-
             for (auto &socket : sockets) {
                 socket.events = POLLIN | POLLERR;
                 socket.revents = 0;
             }
 
             logs(client, 1) << "Starting waiting for message" << std::endl;
-            if (poll(sockets, 2, -1) > 0) {
+            int poll_result;
+            if ((poll_result = poll(sockets, 2, config::client_update_timeout)) > 0) {
                 // Got GUI update
                 if((sockets[0].revents & (POLLIN | POLLERR)) != 0) {
                     if((sockets[0].revents & POLLERR) != 0) {
@@ -48,12 +47,11 @@ public:
 
                     logs(client, 2) << "Got GUI update" << std::endl;
 
-                    auto new_dir = gui_conn.read_direction();
+                    auto new_dir_read = gui_conn.read_direction();
 
-                    if(new_dir != nullptr && *new_dir.get() != direction) {
-                        direction = *new_dir.get();
-                        direction_changed = true;
-                    }
+                    map_maybe_(new_dir_read, [this](auto new_dir) -> void {
+                        this->direction = new_dir;
+                    });
                 }
 
                 // Got server informations
@@ -74,20 +72,20 @@ public:
                     }
                 }
 
+            } else if (poll_result == 0) {
+                logs(comm, 3) << "Nothing updated for client" << std::endl;
             } else {
                 failure("Failing reading socket");
             }
 
-            if(direction_changed) {
-                logs(client, 2) << "Updating direction" << std::endl;
-                serv_conn.send_request(next_id, direction);
-            }
+            logs(client, 2) << "Updating direction" << std::endl;
+            serv_conn.send_request(next_id, direction);
         }
     }
 
 private:
     session_t get_session_id() const {
-        return time(nullptr);
+        return static_cast<session_t>(time(nullptr));
     }
 
     session_t session_id;

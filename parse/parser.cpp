@@ -21,7 +21,7 @@ void try_parse(T & target, const std::string &var_name) {
     }
 }
 
-
+// TODO make sure arguments are set only once
 maybe<server_param> parse_server(const int argc, char **argv) {
     int processed_args = 0;
 
@@ -46,7 +46,6 @@ maybe<server_param> parse_server(const int argc, char **argv) {
             // We count the number of processed arguments
             processed_args += 2;
         }
-
 
         switch (c) {
             case 'W':try_parse(width, "width");break;

@@ -156,7 +156,7 @@ private:
     /** Send given package to every currently listening user
      *
      */
-    void broadcast(ServerPackage package) const {
+    void broadcast(const ServerPackage &package) const {
         logs(comm, 3) << "Broadcasting" << std::endl;
 
         for (auto & connected : connected_users) {
@@ -177,7 +177,7 @@ private:
     /*                         GAME MANAGEMENT                             */
     using player_id_t = uint8_t;
 
-    player_id_t get_player_id(PlayerPtr player) const {
+    player_id_t get_player_id(const PlayerPtr &player) const {
         return player_ids.at(player);
     }
 

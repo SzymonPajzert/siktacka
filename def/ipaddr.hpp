@@ -62,8 +62,7 @@ public:
         struct addrinfo addr_hints {};
         struct addrinfo *addr_result;
 
-        // TODO restore IPv6
-        for(sa_family_t ai_family : std::vector<sa_family_t>{AF_INET /*, AF_INET6 */}) {
+        for(sa_family_t ai_family : std::vector<sa_family_t>{AF_INET, AF_INET6}) {
             // 'converting' host/port in string to struct addrinfo
             (void) memset(&addr_hints, 0, sizeof(struct addrinfo));
             addr_hints.ai_family = ai_family;
