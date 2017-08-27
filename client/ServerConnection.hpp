@@ -58,10 +58,8 @@ struct ServerUpdate {
         return ServerUpdate {event_no, message.str()};
     }
 
-    static NO_RETURN ServerUpdate game_over(event_no_t event_no) {
-        failure("GAME ENDED - not implemented");
-        // TODO implement
-        (void) event_no;
+    static ServerUpdate game_over(event_no_t event_no) {
+        return ServerUpdate {event_no, "GAME_OVER"};
     }
 };
 
@@ -79,8 +77,6 @@ public:
         , all_player_names() {}
 
     void send_request(event_no_t last_id, turn_dir_t dir) {
-        std::cerr << "Updating for direction: " << (int)dir << "from: " << last_id << std::endl;
-
         sockaddr_in * server = address.get_sockaddr().get();
 
         auto package = ClientPackage { session_id, dir, last_id, player_name };
@@ -107,7 +103,7 @@ public:
             binary_writer_t byte_writer{config::UDP_SIZE};
 
             ssize_t len = recv(sock, byte_writer.get(), byte_writer.size_left(), 0);
-            logs(client, 2) << "Read from socket data of length: " << len << std::endl;
+            logs(comm, 4) << "Read from socket data of length: " << len << std::endl;
             if(len < 0) {
                 syserr("error on datagram from server connection");
             }

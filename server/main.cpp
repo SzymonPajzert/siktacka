@@ -2,7 +2,10 @@
 #include "parse/parser.hpp"
 #include "GameServer.hpp"
 
-std::map<part_t, int> max_log_level {{comm, 10}, {serv, 10}, {addr, 10}, {binary, 10}};
+std::map<part_t, int> max_log_level {
+//         {comm, 10}, {serv, 10}, {addr, 10}, {binary, 10}
+
+};
 
 void print_params(server_param params) {
     std::cout << params.width << std::endl;

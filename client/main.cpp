@@ -5,7 +5,8 @@
 
 
 std::map<part_t, int> max_log_level {
-    {comm, 10}, {client, 10}, {addr, 10}, {binary, 10}};
+    {comm, 3}, {client, 3}, {addr, 10}
+};
 
 int main(int argc, char **argv) {
     auto params = parse_client(argc, argv);

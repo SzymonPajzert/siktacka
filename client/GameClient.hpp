@@ -29,57 +29,65 @@ public:
         sockets[0].fd = gui_conn.get_sock();
         sockets[1].fd = serv_conn.get_sock();
 
-        bool keep_going = true;
-        while(keep_going) {
-            for (auto &socket : sockets) {
-                socket.events = POLLIN | POLLERR;
-                socket.revents = 0;
-            }
+        while(true) {
+            logs(client, 2) << "Restart client" << std::endl;
 
-            logs(client, 1) << "Starting waiting for message" << std::endl;
-            int poll_result;
-            if ((poll_result = poll(sockets, 2, config::CLIENT_UPDATE_TIMEOUT)) > 0) {
-                // Got GUI update
-                if((sockets[0].revents & (POLLIN | POLLERR)) != 0) {
-                    if((sockets[0].revents & POLLERR) != 0) {
-                        failure("GUI failed");
-                    }
+            next_id = 0;
+            direction = 0;
 
-                    logs(client, 2) << "Got GUI update" << std::endl;
-
-                    auto new_dir_read = gui_conn.read_direction();
-
-                    map_maybe_(new_dir_read, [this](auto new_dir) -> void {
-                        this->direction = new_dir;
-                    });
+            while (true) {
+                for (auto &socket : sockets) {
+                    socket.events = POLLIN | POLLERR;
+                    socket.revents = 0;
                 }
 
-                // Got server informations
-                if((sockets[1].revents & (POLLIN | POLLERR)) != 0) {
-                    logs(client, 2) << "Got server informations" << std::endl;
-
-                    auto updates = serv_conn.read_updates();
-                    for(const auto & update : updates) {
-                        logs(client, 3) << "Processing update: " << update.event_no;
-
-                        if(update.event_no == next_id) {
-                            logs(client, 3, false) << " correct";
-                            next_id++;
-                            gui_conn.write_line(update.message);
+                logs(client, 4) << "Starting waiting for message" << std::endl;
+                int poll_result;
+                if ((poll_result = poll(sockets, 2, config::CLIENT_UPDATE_TIMEOUT)) > 0) {
+                    // Got GUI update
+                    if ((sockets[0].revents & (POLLIN | POLLERR)) != 0) {
+                        if ((sockets[0].revents & POLLERR) != 0) {
+                            failure("GUI failed");
                         }
 
-                        logs(client, 3, false) << std::endl;
+                        logs(client, 2) << "Got GUI update" << std::endl;
+
+                        auto new_dir_read = gui_conn.read_direction();
+
+                        map_maybe_(new_dir_read, [this](auto new_dir) -> void {
+                            this->direction = new_dir;
+                        });
                     }
+
+                    // Got server informations
+                    if ((sockets[1].revents & (POLLIN | POLLERR)) != 0) {
+                        logs(client, 2) << "Got server informations" << std::endl;
+
+                        auto updates = serv_conn.read_updates();
+                        for (const auto &update : updates) {
+                            logs(client, 4) << "Processing update: " << update.event_no;
+
+                            if (update.event_no == next_id) {
+                                if(update.message == "GAME_OVER") break;
+
+                                logs(client, 4, false) << " correct";
+                                next_id++;
+                                gui_conn.write_line(update.message);
+                            }
+
+                            logs(client, 4, false) << std::endl;
+                        }
+                    }
+
+                } else if (poll_result == 0) {
+                    logs(comm, 4) << "Nothing updated for client" << std::endl;
+                } else {
+                    failure("Failing reading socket");
                 }
 
-            } else if (poll_result == 0) {
-                logs(comm, 3) << "Nothing updated for client" << std::endl;
-            } else {
-                failure("Failing reading socket");
+                logs(client, 4) << "Updating direction" << std::endl;
+                serv_conn.send_request(next_id, direction);
             }
-
-            logs(client, 2) << "Updating direction" << std::endl;
-            serv_conn.send_request(next_id, direction);
         }
     }
 
