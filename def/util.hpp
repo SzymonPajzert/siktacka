@@ -171,6 +171,7 @@ enum part_t {
     addr,
     binary,
     client,
+    errors
 };
 
 extern std::map<part_t, int> max_log_level;

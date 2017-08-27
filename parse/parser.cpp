@@ -83,15 +83,15 @@ maybe<client_param> parse_client(const int argc, char **argv) {
     maybe<IP> maybe_gui_address;
 
     maybe_server_address = or_maybe(
-            parse_address(argv[2]),
-            IP::parse(argv[2], client_param::default_server_port));
+            IP::parse(UDP, argv[2]),
+            IP::parse(UDP, argv[2], client_param::default_server_port));
 
     if(argc == 4) {
         maybe_gui_address = or_maybe(
-                parse_address(argv[3]),
-                IP::parse(argv[3], client_param::default_gui_port));
+                IP::parse(TCP, argv[3]),
+                IP::parse(TCP, argv[3], client_param::default_gui_port));
     } else {
-        maybe_gui_address = IP::parse(
+        maybe_gui_address = IP::parse(TCP,
                 client_param::default_gui_address,
                 client_param::default_gui_port);
     }

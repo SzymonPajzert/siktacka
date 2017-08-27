@@ -70,16 +70,20 @@ struct binary_reader_t {
     }
 
     maybe<std::string> read_string() {
-        maybe<char> may_c;
+        maybe<byte_t> may_c = nothing<byte_t>;
         std::string result_string {};
+        bool read_failed = false;
 
-        while((may_c = this->read<char>()) != nullptr && *may_c.get() != 0) {
+        // End if message finished or we fail
+        while(unread_size() > 0 and // try more only if there's something to read
+                // If we fail reading, set read_failed to true
+                ((((may_c = read<byte_t>()) != nullptr) or (read_failed=true, false)) and *may_c.get() != 0)) {
             result_string.push_back(*may_c);
         }
 
         maybe<std::string> result = nullptr;
         // reading not failed, we can return result
-        if(may_c != nullptr) {
+        if(!read_failed) {
             result = std::make_shared<std::string>(std::string(result_string));
         }
 
@@ -129,13 +133,15 @@ struct binary_writer_t {
         ok = ok and can_write;
     }
 
-    void write(const std::string & string) {
+    void write(const std::string & string, bool append_zero=true) {
         for(auto c : string) {
             write<char>(c);
             if(!is_ok()) break;
         }
-        // Check how strings should end
-        write<char>('\0');
+
+        if(append_zero) {
+            write<char>('\0');
+        }
     }
 
     /** Writes binary data to the buffer

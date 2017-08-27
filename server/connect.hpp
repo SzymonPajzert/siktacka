@@ -22,7 +22,10 @@ using ServerPackage = std::vector<binary_t>;
 class TimeoutSocket {
 public:
 
-    TimeoutSocket(timeout_t _timeout, port_t _port) : timeout(_timeout), sock(get_sock(_port)) {};
+    TimeoutSocket(timeout_t _timeout, port_t _port)
+        : const_timeout(_timeout)
+        , timeout(const_timeout)
+        , sock(get_sock(_port)) {};
 
     using socket_data = std::tuple<IP, ClientPackage>;
 
@@ -32,7 +35,7 @@ public:
      *
      * @return First proper value or nothing if there is timeout
      */
-    maybe<socket_data> receive() const;
+    maybe<socket_data> receive(bool do_timeout=true);
 
     /** Queue for sending given user package
      *
@@ -40,12 +43,21 @@ public:
      * @param package
      * @return
      */
-    bool send(IP address, ServerPackage packages);
+    bool send(IP address, ServerPackage packages) const;
 
     sock_t get_sock(port_t port);
 
-    timeout_t timeout; //< timeout after which we'll stop waiting for the messages
+
+    // TODO update timeout taking into account server processing
+
+    const timeout_t const_timeout; //< timeout after which we'll stop waiting for the messages
+    timeout_t timeout; //< current timeout
     const sock_t sock;
+
+    /** Restore timeout as well as wait specified amount of time left (if any)
+     *
+     */
+    void reset();
 };
 
 

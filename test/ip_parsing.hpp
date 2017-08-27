@@ -52,14 +52,14 @@ Test test_ip_parsing() {
     std::cout << std::endl << "Checking parseable with port" << std::endl;
     for(const auto &address : parseable) {
         std::cout << "Parsing: " << address << " " << std::flush;
-        auto result = parse_address(address);
+        auto result = IP::parse(UDP, address);
         std::cout << instance.test(result != nullptr) << std::endl;
     }
 
     std::cout << std::endl << "Checking parseable without port" << std::endl;
     for(const auto &address : parseable_without_port) {
         std::cout << "Parsing: " << address << " " << std::flush;
-        auto result = IP::parse(address, default_port);
+        auto result = IP::parse(TCP, address, default_port);
         std::cout << instance.test(result != nullptr) << std::endl;
     }
 

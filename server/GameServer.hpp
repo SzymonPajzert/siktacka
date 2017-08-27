@@ -69,7 +69,7 @@ struct angle_t {
     static constexpr double PI = 3.14159265;
 };
 
-using disc_position_t = std::pair<size_t, size_t>;
+using disc_position_t = std::pair<dim_t, dim_t>;
 struct position_t {
     double x, y;
 
@@ -120,7 +120,7 @@ private:
     bool initialize_map();
 
     /// Works like @class TimeoutSocket but processes the data
-    maybe<PlayerPackage> receive_next();
+    maybe<PlayerPackage> receive_next(bool do_timeout=true);
 
     // TODO take into accont session_id
     /* TODO(szpajz) - Implement and add to docs:
@@ -157,8 +157,12 @@ private:
      *
      */
     void broadcast(ServerPackage package) const {
-        (void)package;
-        // TODO implement
+        logs(comm, 3) << "Broadcasting" << std::endl;
+
+        for (auto & connected : connected_users) {
+            logs(comm, 4) << "Sending to: " << connected->player_name << std::endl;
+            socket.send(connected->address, package);
+        }
     }
 
     /** Predicate necessary to start game
@@ -170,8 +174,6 @@ private:
 
     bool game_finished() const;
 
-
-
     /*                         GAME MANAGEMENT                             */
     using player_id_t = uint8_t;
 
@@ -179,7 +181,7 @@ private:
         return player_ids.at(player);
     }
 
-    /**
+    /** Encapsulates data in a common event format
      *
      * @param event_data
      * @return Size of the encapsulated data
@@ -204,8 +206,6 @@ private:
         } else {
             failure("Writer failed");
         }
-
-
 
         return len;
     }
@@ -243,14 +243,14 @@ private:
      * @param player
      * @param position
      */
-    void generate_pixel(const PlayerPtr player, disc_position_t position) {
+    void generate_pixel(const PlayerPtr & player, disc_position_t position) {
         logs(serv, 3) << "generate: pixel" << std::endl;
-        auto event = get_new_event_no();
+        event_no_t event = get_new_event_no();
 
         binary_writer_t writer { config::BUFFER_SIZE };
 
-        writer.write(host_to_net(event));
-        writer.write(host_to_net(PIXEL));
+        writer.write(host_to_net<event_no_t>(event));
+        writer.write(host_to_net<event_type_t>(PIXEL));
         writer.write(host_to_net<uint8_t>(get_player_id(player)));
         writer.write(host_to_net(position.first));
         writer.write(host_to_net(position.second));
@@ -259,8 +259,13 @@ private:
             failure("writing in generate_pixel failed");
         }
 
-        if(encaps_write_event(writer.save()) != 4+4+1+(1+4+4)+4) {
-            failure("generate_pixel - number of bytes written is wrong");
+        auto data = writer.save();
+
+        auto saved_size = encaps_write_event(data);
+        typeof(saved_size) required_size = 4+4+1+(1+4+4)+4;
+        if(saved_size != required_size) {
+            logs(errors, 0) << saved_size << " != " << required_size;
+            failure("generate_pixel - number of bytes written is wrong ");
         }
     }
 

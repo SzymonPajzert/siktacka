@@ -10,6 +10,8 @@ void binary_writer_t::write_bytes(binary_t data) {
     if (ok) {
         memcpy(get(), data.bytes.get(), data.length);
     }
+
+    move(data.length);
 }
 
 binary_t binary_writer_t::save() const {

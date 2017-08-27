@@ -6,6 +6,7 @@
 #include <netinet/in.h>
 #include <poll.h>
 #include <def/config.hpp>
+#include <sys/time.h>
 #include "connect.hpp"
 
 int TimeoutSocket::get_sock(port_t port) {
@@ -29,7 +30,7 @@ int TimeoutSocket::get_sock(port_t port) {
     return return_sock;
 }
 
-maybe<std::tuple<IP, ClientPackage> > TimeoutSocket::receive() const {
+maybe<std::tuple<IP, ClientPackage> > TimeoutSocket::receive(bool do_timeout) {
     logs(comm, 4) << "TimeoutSocket::receive()" << std::endl;
 
     pollfd client[1];
@@ -46,8 +47,17 @@ maybe<std::tuple<IP, ClientPackage> > TimeoutSocket::receive() const {
     auto rcva_len = (socklen_t) sizeof(client_address);
     const int flags = 0;
 
+    if(timeout < 0) return nullptr;
+
     // TODO make timeout update
-    ret = poll(client, 1, this->timeout);
+    timeval time_before, time_after;
+    gettimeofday(&time_before, NULL);
+
+    maybe<std::tuple<IP, ClientPackage> > result = nullptr;
+
+    // If we shoudn't timeout, wait indifinitely
+    auto poll_time_wait = do_timeout ? this->timeout : -1;
+    ret = poll(client, 1, poll_time_wait);
 
     if (ret < 0) {
         syserr("Poll failed");
@@ -79,7 +89,7 @@ maybe<std::tuple<IP, ClientPackage> > TimeoutSocket::receive() const {
         if(maybe_client_package != nullptr) {
             logs(comm, 2) << "Non trival client-stub package read." << std::endl;
         }
-        return map_maybe<ClientPackage, socket_data>
+        result = map_maybe<ClientPackage, socket_data>
                 (maybe_client_package,
                  [client_address](auto client_package) -> auto {
                      logs(comm, 3) << "Client package:(" << notstd::to_string(client_package) << ")" << std::endl;
@@ -89,27 +99,53 @@ maybe<std::tuple<IP, ClientPackage> > TimeoutSocket::receive() const {
         logs(comm, 4) << "Nothing read from socket" << std::endl;
     }
 
-    return nullptr;
+    gettimeofday(&time_after, NULL);
+
+    auto milliseconds_diff =
+            (time_after.tv_sec - time_before.tv_sec) * 1000 +
+            (time_after.tv_usec - time_before.tv_usec) / 1000;
+    logs(comm, 5) << "passed " << milliseconds_diff << "ms";
+
+    if(do_timeout) {
+        // Decrease timeout to stop reading after some time
+        timeout -= milliseconds_diff;
+    }
+
+    return result;
 }
 
-bool TimeoutSocket::send(IP address, ServerPackage packages) {
+bool TimeoutSocket::send(IP address, ServerPackage packages) const {
+    logs(comm, 5) << "TimeoutSocket::send" << std::endl;
 
     for (const auto package : packages) {
         int sflags = 0;
 
-        std::weak_ptr<sockaddr_in> client_address = address.get_sockaddr();
-        auto snda_len = (socklen_t) sizeof(client_address);
-        ssize_t snd_len = sendto(sock, package.bytes.get(), package.length, sflags,
-                                 (struct sockaddr *) &client_address, snda_len);
+        sockaddr_in * client_address = address.get_sockaddr().get();
+        auto snda_len = (socklen_t) sizeof(*client_address);
 
+        ssize_t snd_len = sendto(sock, package.bytes.get(), package.length, sflags,
+                                 (struct sockaddr *) client_address, snda_len);
         if (snd_len < 0) {
-            syserr("TimeoutSocket::send: error on sending datagram to client-stub socket");
+            syserr("TimeoutSocket::send: error on sending datagram to client socket");
         }
         if(static_cast<size_t>(snd_len) != package.length) {
-            syserr("TimeoutSocket::send: error on sending datagram to client-stub socket");
+            failure("TimeoutSocket::send: not able to send all the data");
         }
+
+        logs(comm, 4) << "TimeoutSocket::send: package sent" << std::endl;
+
     }
 
 
     return false;
+}
+
+void TimeoutSocket::reset() {
+    // If timeout is bigger than 0, use unused time
+    if(timeout > 0) {
+        poll(nullptr, 0, timeout);
+        logs(errors, 1) << "Warning, socket has unused time" << std::endl;
+    }
+
+    timeout = const_timeout;
 }

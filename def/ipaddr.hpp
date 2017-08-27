@@ -11,6 +11,12 @@
 #include "types.hpp"
 #include "util.hpp"
 
+// TODO take into account in parsing
+enum proto_t {
+    UDP,
+    TCP
+};
+
 class IP {
 public:
     explicit IP(sockaddr_in sock_address) : address(std::make_shared<sockaddr_in>(sock_address)) {}
@@ -21,24 +27,48 @@ public:
      * @param port Value of the port to be assigned while creating instance of the address
      * @return
      */
-    static maybe<IP> parse(const std::string & ip_string, port_t port) {
-        return map_maybe<sockaddr_in, IP>(convert_address(ip_string, port), [](auto converted_address)-> auto {
+    static maybe<IP> parse(proto_t protocol, const std::string & ip_string, port_t port) {
+        return map_maybe<sockaddr_in, IP>(convert_address(protocol, ip_string, port), [](auto converted_address)-> auto {
             return IP(converted_address);
         });
     }
 
+    /** Parse IP address from a string assuming it has port specified
+     *
+     * @param ip_string String representing IPv4 or IPv6 address with port number
+     * @return IP address represented by the string
+     */
+    static maybe<IP> parse(proto_t protocol, const std::string & ip_string) {
+        // find the position of address delimiter
+        auto delim_pos = ip_string.find_last_of(":");
+        maybe<IP> result = nullptr;
+
+        if(delim_pos != std::string::npos && delim_pos + 1 != ip_string.length()) {
+            auto port_string = ip_string.substr(delim_pos+1);
+            auto address_string = ip_string.substr(0, delim_pos);
+
+            port_t port_number;
+            if(maybe_assign(parse_int<port_t>(port_string), port_number)) {
+                result = IP::parse(protocol, address_string, port_number);
+            }
+        }
+
+        return result;
+    }
+
     // TODO move
-    static maybe<sockaddr_in> convert_address(const std::string & ip_string, port_t port) {
+    static maybe<sockaddr_in> convert_address(proto_t protocol, const std::string & ip_string, port_t port) {
         std::shared_ptr<sockaddr_in> address = nullptr;
         struct addrinfo addr_hints {};
         struct addrinfo *addr_result;
 
-        for(sa_family_t ai_family : std::vector<sa_family_t>{AF_INET, AF_INET6}) {
+        // TODO restore IPv6
+        for(sa_family_t ai_family : std::vector<sa_family_t>{AF_INET /*, AF_INET6 */}) {
             // 'converting' host/port in string to struct addrinfo
             (void) memset(&addr_hints, 0, sizeof(struct addrinfo));
             addr_hints.ai_family = ai_family;
-            addr_hints.ai_socktype = SOCK_DGRAM;
-            addr_hints.ai_protocol = IPPROTO_UDP;
+            addr_hints.ai_socktype = (protocol == UDP ? SOCK_DGRAM : SOCK_STREAM);
+            addr_hints.ai_protocol = (protocol == UDP ? IPPROTO_UDP : IPPROTO_TCP);
             addr_hints.ai_flags = 0;
             addr_hints.ai_addrlen = 0;
             addr_hints.ai_addr = NULL;
@@ -101,28 +131,6 @@ private:
 };
 
 
-// TODO probably make it static method as well
-/** Parse IP address from a string assuming it has port specified
- *
- * @param ip_string String representing IPv4 or IPv6 address with port number
- * @return IP address represented by the string
- */
-inline maybe<IP> parse_address(const std::string & ip_string) {
-    // find the position of address delimiter
-    auto delim_pos = ip_string.find_last_of(":");
-    maybe<IP> result = nullptr;
 
-    if(delim_pos != std::string::npos && delim_pos + 1 != ip_string.length()) {
-        auto port_string = ip_string.substr(delim_pos+1);
-        auto address_string = ip_string.substr(0, delim_pos);
-
-        port_t port_number;
-        if(maybe_assign(parse_int<port_t>(port_string), port_number)) {
-            result = IP::parse(address_string, port_number);
-        }
-    }
-
-    return result;
-}
 
 #endif //SIKTACKA_IPADDR_HPP

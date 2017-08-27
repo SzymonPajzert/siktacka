@@ -151,7 +151,7 @@ private:
     std::vector<std::string> all_player_names;
 
     static int create_sock() {
-        const int result_sock = socket(PF_INET, SOCK_DGRAM, 0);
+        const int result_sock = socket(AF_INET, SOCK_DGRAM, 0);
         if (result_sock < 0)
             syserr("socket");
         return result_sock;

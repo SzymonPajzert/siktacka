@@ -18,6 +18,8 @@ bool GameServer::play_game() {
         return false;
     }
 
+    // TODO broadcast to players after game start
+
     bool play_game = true;
     while(play_game) {
         logs(serv, 3) << "In play_game loop" << std::endl;
@@ -26,12 +28,15 @@ bool GameServer::play_game() {
             logs(serv, 5) << "Received nonempty command";
             map_maybe_(read_command, [this](PlayerPackage command) -> void {
                 auto event_no = command.package.next_expected_event_no;
+                logs(comm, 2) << "Responding to client request" << std::endl;
                 auto package = get_from(event_no);
                 socket.send(command.owner->get_address(), package);
             });
         }
 
         // We got timeouted and have to process the next step
+        socket.reset();
+
         auto calculate_result = calculate_step();
         play_game = !std::get<0>(calculate_result);
         ServerPackage next_action = std::move(std::get<1>(calculate_result));
@@ -98,7 +103,7 @@ bool GameServer::can_start() const {
         if(!playerPtr->player_name.empty()) {
             player_count++;
             std::cerr << player_directions.size() << std::endl;
-            all_pressed = player_directions.at(playerPtr) != 0;
+            all_pressed = all_pressed and player_directions.find(playerPtr) != player_directions.end();
             logs(serv, 7) << " " << all_pressed;
             if(!all_pressed) break;
         }
@@ -120,10 +125,10 @@ bool GameServer::start_game() {
     while(!can_start()) {
         logs(serv, 2) << "In loop for start game" << std::endl;
 
-        auto package = receive_next();
+        auto package = receive_next(false);
 
         if(package != nullptr) {
-            logs(serv, 2) << "Read client-stub package" << std::endl;
+            logs(serv, 2) << "Read client package" << std::endl;
         }
     }
 
@@ -135,13 +140,13 @@ ServerPackage GameServer::get_from(event_no_t event_no) const {
     std::vector<binary_t> interesting_events;
 
     for(size_t it = event_no; it < events.size(); it++) {
-        logs(serv, 3) << "Serializing event no: " << it << std::endl;
+        logs(serv, 4) << "Serializing event no: " << it << std::endl;
+
         interesting_events.push_back(events[it]);
     }
 
     std::vector<binary_t> serialized_events {};
 
-    // TODO create big utility adding the binaries together
     auto new_writer = [this]() -> auto {
         binary_writer_t writer { config::BUFFER_SIZE };
         writer.write(this->game_id);
@@ -154,7 +159,10 @@ ServerPackage GameServer::get_from(event_no_t event_no) const {
 
     auto writer = new_writer();
     for(auto event : interesting_events) {
+        logs(serv, 4) << "Event serialized" << std::endl;
+
         if(writer.size_left() < event.length) {
+            logs(serv, 3) << "Full package, creating new" << std::endl;
             serialized_events.push_back(writer.save());
             writer = new_writer();
         }
@@ -164,13 +172,14 @@ ServerPackage GameServer::get_from(event_no_t event_no) const {
             failure("Failed writing to the buffer");
         }
     }
+    logs(serv, 3) << "Finished writing package" << std::endl;
     serialized_events.push_back(writer.save());
 
     return serialized_events;
 }
 
-maybe<PlayerPackage> GameServer::receive_next() {
-    return map_maybe<TimeoutSocket::socket_data, PlayerPackage> (socket.receive(),
+maybe<PlayerPackage> GameServer::receive_next(bool do_timeout) {
+    return map_maybe<TimeoutSocket::socket_data, PlayerPackage> (socket.receive(do_timeout),
                                                                   [this](auto data) -> auto {
         return PlayerPackage{ this->resolve_player(data), std::get<1>(data) };
     });
