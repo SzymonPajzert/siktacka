@@ -15,7 +15,6 @@
 /// Data sent from the server
 using ServerPackage = std::vector<binary_t>;
 
-
 /** Allows reading from socket awaiting messages with timeout
  *
  */
@@ -24,7 +23,7 @@ public:
 
     TimeoutSocket(timeout_t _timeout, port_t _port)
         : const_timeout(_timeout)
-        , timeout(const_timeout)
+        , last_time(get_cur_time() + const_timeout)
         , sock(get_sock(_port)) {};
 
     using socket_data = std::tuple<IP, ClientPackage>;
@@ -47,11 +46,8 @@ public:
 
     sock_t get_sock(port_t port);
 
-
-    // TODO update timeout taking into account server processing
-
     const timeout_t const_timeout; //< timeout after which we'll stop waiting for the messages
-    timeout_t timeout; //< current timeout
+    timeout_t last_time; //< current timeout
     const sock_t sock;
 
     /** Restore timeout as well as wait specified amount of time left (if any)

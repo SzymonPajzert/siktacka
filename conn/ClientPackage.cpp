@@ -2,12 +2,11 @@
 // Created by svp on 26.08.17.
 //
 
-#include <def/config.hpp>
 #include "ClientPackage.hpp"
 
 template<>
 binary_t serialize<ClientPackage>(const ClientPackage &package) {
-    binary_writer_t writer{config::BUFFER_SIZE};
+    binary_writer_t writer{config::UDP_SIZE};
 
     writer.write(host_to_net(package.session_id));
     writer.write(host_to_net(package.turn_direction));

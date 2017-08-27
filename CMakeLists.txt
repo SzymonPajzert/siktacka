@@ -32,9 +32,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O -Wall -Weffc++ -pedantic  \
 include_directories(.)
 
 set(SHARED_SOURCE_FILES
-        def/ipaddr.hpp
+        def/ipaddr.hpp def/ipaddr.cpp
         def/types.hpp
-        parse/parser.hpp def/util.hpp parse/parser.cpp def/util.cpp def/binary.cpp def/binary.hpp def/config.hpp conn/ClientPackage.hpp conn/ClientPackage.cpp)
+        parse/parser.hpp def/util.hpp parse/parser.cpp def/util.cpp def/binary.cpp def/binary.hpp conn/ClientPackage.hpp conn/ClientPackage.cpp)
 
 
 set(SERVER_SOURCE_FILES
@@ -71,5 +71,6 @@ set(GUI_STUB_FILES
         test/gui-stub/main.cpp)
 add_executable(gui-stub ${GUI_STUB_FILES})
 
-
+target_link_libraries(gui-stub z)
 target_link_libraries(siktacka-server z)
+target_link_libraries(siktacka-client z)

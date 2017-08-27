@@ -99,9 +99,7 @@ private:
         if (result_exchange == NULL)
             syserr("fdopen");
 
-        // TODO check if not needed
         setlinebuf(result_exchange);
-        // buf_size = 10000;
 
         return result_exchange;
     }

@@ -15,7 +15,6 @@
 
 #include "util.hpp"
 
-// todo move to binary
 struct binary_t {
     std::shared_ptr<byte_t> bytes;
     const size_t length;
@@ -42,7 +41,7 @@ struct binary_reader_t {
             , counter(0)
             , data_source(_data_source) {
 
-        // TODO implement behaviour fail prone and set to true by default
+        // TODO(maybe) implement behaviour fail prone and set to true by default
         (void) fail;
     };
 
@@ -63,8 +62,7 @@ struct binary_reader_t {
 
             return std::make_shared<T>(value);
         } else {
-            // TODO allow logging here
-            std::cerr << "Tried to read too much data" << std::endl;
+            logs(binary, 2) << "Tried to read too much data" << std::endl;
             return nullptr;
         }
     }
@@ -77,7 +75,7 @@ struct binary_reader_t {
         // End if message finished or we fail
         while(unread_size() > 0 and // try more only if there's something to read
                 // If we fail reading, set read_failed to true
-                ((((may_c = read<byte_t>()) != nullptr) or (read_failed=true, false)) and *may_c.get() != 0)) {
+                ((((may_c = read<byte_t>()) != nullptr) or ((read_failed=true), false)) and *may_c.get() != 0)) {
             result_string.push_back(*may_c);
         }
 
@@ -119,7 +117,6 @@ struct binary_writer_t {
 
     binary_t save() const;
 
-    // TODO store result in internal state, assume that writing never fails
     template<typename T>
     void write(T value) {
         constexpr auto size = sizeof(T);

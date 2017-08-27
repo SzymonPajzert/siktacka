@@ -17,8 +17,7 @@ bool GameServer::play_game() {
         std::cerr << "Game cannot start - cannot collect players" << std::endl;
         return false;
     }
-
-    // TODO broadcast to players after game start
+    broadcast(get_from(0));
 
     bool play_game = true;
     while(play_game) {
@@ -54,6 +53,7 @@ PlayerPtr GameServer::resolve_player(TimeoutSocket::socket_data data) {
 
     auto player_address = std::get<0>(data);
     auto player_name = std::get<1>(data).player_name;
+    auto player_session_id = std::get<1>(data).session_id;
 
     PlayerPtr result = nullptr;
     for(const auto & player : connected_users) {
@@ -66,7 +66,10 @@ PlayerPtr GameServer::resolve_player(TimeoutSocket::socket_data data) {
             << std::endl;
 
         if (same_address and same_name) {
-            if (result != nullptr) failure("Indistinguishable users");
+            if (result != nullptr and result->session_id == player_session_id) failure("Indistinguishable users");
+            if (result->session_id < player_session_id) {
+                result->session_id = player_session_id;
+            }
 
             result = player;
         }
@@ -76,8 +79,7 @@ PlayerPtr GameServer::resolve_player(TimeoutSocket::socket_data data) {
     if(result == nullptr) {
         logs(serv, 2) << "Creating new user: " << player_name << std::endl;
 
-        // TODO(maybe) consider putting everything into a separate add_player(...) since player instances are game dependent
-        result = std::make_shared<Player>(Player { player_name, player_address });
+        result = std::make_shared<Player>(Player { player_name, player_session_id, player_address });
 
         connected_users.insert(result);
     } else {
@@ -87,8 +89,10 @@ PlayerPtr GameServer::resolve_player(TimeoutSocket::socket_data data) {
     // If player is successfully resolved, update their direction
     if(result != nullptr) {
         player_directions[result] = std::get<1>(data).turn_direction;
+        last_activity[result] = get_cur_time();
     }
 
+    player_cleanup();
 
     return result;
 }
@@ -148,7 +152,7 @@ ServerPackage GameServer::get_from(event_no_t event_no) const {
     std::vector<binary_t> serialized_events {};
 
     auto new_writer = [this]() -> auto {
-        binary_writer_t writer { config::BUFFER_SIZE };
+        binary_writer_t writer { config::UDP_SIZE };
         writer.write(this->game_id);
 
         if(!writer.is_ok()) {
@@ -202,7 +206,6 @@ std::tuple<bool, ServerPackage> GameServer::calculate_step() {
     return std::make_tuple<bool, ServerPackage>(game_finished(), std::move(new_actions));
 }
 
-// TODO fail if putting head out of bounds
 void GameServer::move_head(PlayerPtr player) {
     logs(serv, 3) << "Move head" << std::endl;
     auto position = head_positions[player];
@@ -243,17 +246,129 @@ bool GameServer::initialize_map() {
     return true;
 }
 
-bool GameServer::try_put_pixel(PlayerPtr player, disc_position_t position) {
-    bool result;
+template<typename T>
+bool in(const T & x, const T & first, const T & second) {
+    return x >= first and x <= second;
+}
 
-    if(occupied_positions.find(position) == occupied_positions.end()) {
+bool GameServer::try_put_pixel(PlayerPtr player, disc_position_t position) {
+    bool result =
+        in(position.first, 0, params.width - 1) and
+        in(position.second, 0, params.height - 1) and
+        (occupied_positions.find(position) == occupied_positions.end());
+
+    if(result) {
         generate_pixel(player, position);
-        result = true;
     } else {
         generate_player_eliminated(player);
-        result = false;
     }
 
     return result;
 }
 
+len_t WARN_UNUSED GameServer::encaps_write_event(binary_t event_data) {
+    auto len = static_cast<len_t>(event_data.length + 4 + 4); // take into account len + crc32;
+
+    binary_writer_t writer { config::EVENT_SIZE };
+    writer.write<uint32_t>(len);
+    writer.write_bytes(event_data);
+
+    uLong crc = crc32(0L, Z_NULL, 0);
+    crc = crc32(crc, (const unsigned char*)&len, sizeof(len));
+    crc = crc32(crc, event_data.bytes.get(), static_cast<uInt>(event_data.length));
+
+    writer.write<crc_t>(static_cast<crc_t>(crc));
+
+    if(writer.is_ok()) {
+        events.push_back(writer.save());
+    } else {
+        failure("Writer failed");
+    }
+
+    return len;
+}
+
+void check_size(len_t saved_size, len_t required_size, const std::string &description) {
+    if(saved_size != required_size) {
+        logs(errors, 0) << saved_size << " != " << required_size;
+        failure(description + " - number of bytes written is wrong ");
+    }
+}
+
+void GameServer::generate_new_game() {
+    logs(serv, 3) << "generate: new_game" << std::endl;
+    auto event = get_new_event_no();
+
+    binary_writer_t writer { config::EVENT_SPECIFIC_SIZE };
+
+    writer.write(host_to_net(event));
+    writer.write(host_to_net(NEW_GAME));
+    writer.write(host_to_net(params.width));
+    writer.write(host_to_net(params.height));
+
+    if(writer.is_ok()) {
+        for(auto player_dir : player_directions) {
+            auto player = player_dir.first;
+            writer.write(player->player_name);
+            writer.write('\0');
+        }
+    }
+
+    if(!writer.is_ok()) {
+        failure("writing in generate_new_game failed");
+    }
+
+    len_t required_size = 4+4+1+(2 * sizeof(dim_t)) + 4;
+    for(auto player_dir : player_directions) {
+        auto player = player_dir.first;
+        required_size += 1 + player->player_name.size();
+    }
+
+    check_size(encaps_write_event(writer.save()), required_size, "generate_new_game");
+}
+
+void GameServer::generate_pixel(const PlayerPtr &player, disc_position_t position) {
+    logs(serv, 3) << "generate: pixel" << std::endl;
+    event_no_t event = get_new_event_no();
+
+    binary_writer_t writer { config::EVENT_SPECIFIC_SIZE };
+
+    writer.write(host_to_net<event_no_t>(event));
+    writer.write(host_to_net<event_type_t>(PIXEL));
+    writer.write(host_to_net<uint8_t>(get_player_id(player)));
+    writer.write(host_to_net(position.first));
+    writer.write(host_to_net(position.second));
+
+    if(!writer.is_ok()) {
+        failure("writing in generate_pixel failed");
+    }
+
+    check_size(encaps_write_event(writer.save()), 4+4+1+(1+4+4)+4, "generate_pixel");
+}
+
+void GameServer::generate_player_eliminated(PlayerPtr player) {
+    logs(serv, 3) << "generate: player_eliminated" << std::endl;
+    auto event = get_new_event_no();
+
+    binary_writer_t writer { config::EVENT_SPECIFIC_SIZE };
+    writer.write(host_to_net(event));
+    writer.write(host_to_net(PLAYER_ELIMINATED));
+    writer.write(host_to_net<uint8_t>(get_player_id(player)));
+
+    if(!writer.is_ok()) {
+        failure("writing in generate_new_game failed");
+    }
+
+    check_size(encaps_write_event(writer.save()), 4+4+1+(1)+4, "generate_player_eliminated");
+}
+
+void GameServer::player_cleanup() {
+    auto cur_time = get_cur_time();
+
+    for(const auto & playerDir : player_directions) {
+        if(last_activity.at(playerDir.first) < cur_time - config::INACTIVITY_KICK) {
+            logs(serv, 3) << "Removing player " << playerDir.first->player_name << std::endl;
+            player_directions.erase(playerDir.first);
+        }
+    }
+}

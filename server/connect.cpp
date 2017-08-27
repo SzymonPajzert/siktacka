@@ -5,7 +5,6 @@
 #include <parse/parser.hpp>
 #include <netinet/in.h>
 #include <poll.h>
-#include <def/config.hpp>
 #include <sys/time.h>
 #include "connect.hpp"
 
@@ -13,7 +12,7 @@ int TimeoutSocket::get_sock(port_t port) {
     int return_sock;
     sockaddr_in server_address {};
 
-    // TODO check which
+    // TODO(maybe) check which
     return_sock = socket(AF_INET, SOCK_DGRAM, 0); // creating IPv4 UDP socket
     if (return_sock < 0)
         syserr("Socket creation failed");
@@ -30,6 +29,7 @@ int TimeoutSocket::get_sock(port_t port) {
     return return_sock;
 }
 
+
 maybe<std::tuple<IP, ClientPackage> > TimeoutSocket::receive(bool do_timeout) {
     logs(comm, 4) << "TimeoutSocket::receive()" << std::endl;
 
@@ -39,7 +39,7 @@ maybe<std::tuple<IP, ClientPackage> > TimeoutSocket::receive(bool do_timeout) {
 
     sockaddr_in client_address{};
 
-    binary_writer_t byte_writer{config::BUFFER_SIZE};
+    binary_writer_t byte_writer{config::UDP_SIZE};
 
     ssize_t ret;
 
@@ -47,16 +47,14 @@ maybe<std::tuple<IP, ClientPackage> > TimeoutSocket::receive(bool do_timeout) {
     auto rcva_len = (socklen_t) sizeof(client_address);
     const int flags = 0;
 
-    if(timeout < 0) return nullptr;
 
-    // TODO make timeout update
-    timeval time_before, time_after;
-    gettimeofday(&time_before, NULL);
+    auto cur_time = get_cur_time();
+    if(last_time < cur_time) return nullptr;
 
     maybe<std::tuple<IP, ClientPackage> > result = nullptr;
 
     // If we shoudn't timeout, wait indifinitely
-    auto poll_time_wait = do_timeout ? this->timeout : -1;
+    auto poll_time_wait = do_timeout ? last_time - cur_time : -1;
     ret = poll(client, 1, poll_time_wait);
 
     if (ret < 0) {
@@ -99,18 +97,6 @@ maybe<std::tuple<IP, ClientPackage> > TimeoutSocket::receive(bool do_timeout) {
         logs(comm, 4) << "Nothing read from socket" << std::endl;
     }
 
-    gettimeofday(&time_after, NULL);
-
-    auto milliseconds_diff =
-            (time_after.tv_sec - time_before.tv_sec) * 1000 +
-            (time_after.tv_usec - time_before.tv_usec) / 1000;
-    logs(comm, 5) << "passed " << milliseconds_diff << "ms";
-
-    if(do_timeout) {
-        // Decrease timeout to stop reading after some time
-        timeout -= milliseconds_diff;
-    }
-
     return result;
 }
 
@@ -142,10 +128,11 @@ bool TimeoutSocket::send(IP address, ServerPackage packages) const {
 
 void TimeoutSocket::reset() {
     // If timeout is bigger than 0, use unused time
-    if(timeout > 0) {
-        poll(nullptr, 0, timeout);
+    auto cur_time = get_cur_time();
+    if(last_time > cur_time) {
+        poll(nullptr, 0, last_time - cur_time);
         logs(errors, 1) << "Warning, socket has unused time" << std::endl;
     }
 
-    timeout = const_timeout;
+    last_time = get_cur_time() + const_timeout;
 }

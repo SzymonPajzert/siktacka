@@ -8,10 +8,9 @@
 #include <iostream>
 #include <endian.h>
 #include <map>
+#include <sys/time.h>
 #include "types.hpp"
 
-
-// TODO move to utils
 template<typename T>
 bool maybe_assign(maybe<T> value, T & target) {
     bool result = false;
@@ -123,6 +122,15 @@ maybe<A> bind_maybe(maybe<T> value, Func fun) {
     }
 }
 
+template<typename K, typename V>
+V get_or(std::map<K, V> map, K key, V default_value) {
+    if(map.find(key) == map.end()) {
+        return default_value;
+    } else {
+        return map.at(key);
+    }
+}
+
 template<typename T>
 T host_to_net(T value) {
     constexpr size_t size = sizeof(T);
@@ -179,7 +187,6 @@ extern std::map<part_t, int> max_log_level;
 std::ostream & logs(part_t part, int level, bool indent=true);
 
 inline void NO_RETURN syserr(const std::string & message) {
-    // TODO add errno interpretation
     std::cerr << message << std::endl;
     std::cerr << errno << ": " << strerror(errno) << std::endl;
     exit(1);
@@ -201,6 +208,10 @@ inline void print_bytes(const void *object, size_t size) {
     printf("]\n");
 }
 
-
+inline timeout_t get_cur_time() {
+    timeval cur_timeval {};
+    gettimeofday(&cur_timeval, NULL);
+    return cur_timeval.tv_sec * 1000 + cur_timeval.tv_usec / 1000;
+}
 
 #endif //SIKTACKA_UTIL_HPP

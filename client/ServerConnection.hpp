@@ -11,7 +11,7 @@
 #include <def/ipaddr.hpp>
 #include <conn/ClientPackage.hpp>
 #include <poll.h>
-#include <def/config.hpp>
+#include <algorithm>
 #include "AwaitableSocket.hpp"
 
 struct ServerUpdate {
@@ -58,7 +58,7 @@ struct ServerUpdate {
         return ServerUpdate {event_no, message.str()};
     }
 
-    static NO_RETURN  ServerUpdate game_over(event_no_t event_no) {
+    static NO_RETURN ServerUpdate game_over(event_no_t event_no) {
         failure("GAME ENDED - not implemented");
         // TODO implement
         (void) event_no;
@@ -97,7 +97,6 @@ public:
         }
     }
 
-    // TODO Returns updates sorted
     std::vector<ServerUpdate> read_updates() {
         std::vector<ServerUpdate> result;
         pollfd socket {};
@@ -105,7 +104,7 @@ public:
 
         // Read as many as possible available - but first one is assumed to be read
         do {
-            binary_writer_t byte_writer{config::BUFFER_SIZE};
+            binary_writer_t byte_writer{config::UDP_SIZE};
 
             ssize_t len = recv(sock, byte_writer.get(), byte_writer.size_left(), 0);
             logs(client, 2) << "Read from socket data of length: " << len << std::endl;
@@ -124,10 +123,10 @@ public:
             socket.revents = 0;
         } while(poll(&socket, 1, 0) > 0);
 
+        std::sort(result.begin(), result.end());
         return result;
     }
 
-    // TODO validate
     maybe<std::vector<ServerUpdate> > read(binary_t data);
 
     void set_player_names(std::vector<std::string> names) {

@@ -2,6 +2,7 @@
 // Created by svp on 21.08.17.
 //
 
+#include <zlib.h>
 #include "ServerConnection.hpp"
 
 maybe<std::vector<ServerUpdate> > ServerConnection::read(binary_t data) {
@@ -53,8 +54,18 @@ maybe<std::vector<ServerUpdate> > ServerConnection::read(binary_t data) {
             result->push_back(ServerUpdate::game_over(event_no));
         }
 
-        // TODO validate
-        auto crc = reader.read<uint32_t>();
+        const auto crc = reader.read<crc_t>();
+
+        /*if(crc != nullptr) {
+            const uLong calculated_crc = crc32(0L, data.bytes.get(), static_cast<uInt>(data.length - sizeof(crc_t)));
+
+            if(calculated_crc != *crc) {
+                logs(comm, 4) << "Bad crc in a incoming package" << std::endl;
+                result = nullptr;
+            }
+        } else {
+            result = nullptr;
+        }*/
     }
 
     return result;

@@ -38,7 +38,7 @@ public:
 
             logs(client, 1) << "Starting waiting for message" << std::endl;
             int poll_result;
-            if ((poll_result = poll(sockets, 2, config::client_update_timeout)) > 0) {
+            if ((poll_result = poll(sockets, 2, config::CLIENT_UPDATE_TIMEOUT)) > 0) {
                 // Got GUI update
                 if((sockets[0].revents & (POLLIN | POLLERR)) != 0) {
                     if((sockets[0].revents & POLLERR) != 0) {
