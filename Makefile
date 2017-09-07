@@ -15,4 +15,16 @@ siktacka-client: def/ipaddr.o parse/parser.o def/util.o def/binary.o conn/Client
 
 .PHONY: clean TARGET
 clean:
-	rm siktacka-server siktacka-client *.o *~ *.bak
+	rm -f siktacka-server siktacka-client
+	rm -f ./client/GameClient.o
+	rm -f ./client/GUIConnection.o
+	rm -f ./client/ServerConnection.o
+	rm -f ./client/main.o
+	rm -f ./conn/ClientPackage.o
+	rm -f ./def/ipaddr.o
+	rm -f ./def/util.o
+	rm -f ./def/binary.o
+	rm -f ./parse/parser.o
+	rm -f ./server/main.o
+	rm -f ./server/GameServer.o
+	rm -f ./server/connect.o
